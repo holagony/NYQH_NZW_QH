@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "minibounds",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "Id": 0, "PAC": "610802", "NAME": "ÓÜÑôÇø", "width": 1.272609, "height": 1.006541, "angle": 24.083454, "area": 1.280933, "perimeter": 4.5583 }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 110.48482957143959, 38.557347388620187 ], [ 110.074093659051201, 37.638423896048643 ], [ 108.912262263043573, 38.157733590858228 ], [ 109.322998175431962, 39.076657083429772 ], [ 110.48482957143959, 38.557347388620187 ] ] ] } }
+]
+}

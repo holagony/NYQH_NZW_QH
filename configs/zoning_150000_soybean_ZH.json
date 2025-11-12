@@ -1,0 +1,29 @@
+{
+    "drought": {
+        "indicators": {},
+        "cwdi": {
+            "indicators": {},
+            "kc": 0.8,
+            "weights": [
+                0.3,
+                0.25,
+                0.2,
+                0.15,
+                0.1
+            ],
+            "start_date": "01-01",
+            "end_date": "12-31",
+            "year_offset": 0,
+            "aggregation": "mean"
+        },
+        "interpolation": {
+            "method": "idw",
+            "params": {
+                "radius_dist": 2.0,
+                "min_num": 10,
+                "first_size": 200,
+                "fill_nans": true
+            }
+        }
+    }
+}
