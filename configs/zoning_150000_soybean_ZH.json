@@ -24,6 +24,10 @@
                 "first_size": 200,
                 "fill_nans": true
             }
+        },
+        "classification": {
+            "method": "natural_breaks",
+            "num_classes": 4
         }
     }
 }

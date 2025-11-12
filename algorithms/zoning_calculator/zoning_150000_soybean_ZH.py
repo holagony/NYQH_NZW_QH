@@ -88,28 +88,29 @@ def calculate_cwdi(daily_data, kc, weights, lat_deg=None, elev_m=None):
             elev_m = float(df['altitude'].iloc[0])
         df['ET0'] = penman_et0(df, lat_deg, elev_m)
 
-    df['ETc'] = kc * df['ET0']  # 作物需水ETc
-    df_10d = df.resample('10D', label='left').sum()  # 10日尺度累加
-    cond = (df_10d['ETc'] > 0) & (df_10d['ETc'] >= df_10d['P'])  # 存在水分不足
-    df_10d['cwdi_i'] = 0.0
-    df_10d.loc[cond, 'cwdi_i'] = (1 - df_10d.loc[cond, 'P'] / df_10d.loc[cond, 'ETc']) * 100  # 10日不足指数
+    df['ETc'] = kc * df['ET0']
+    etc_shift = df['ETc'].shift(1)
+    p_shift = df['P'].shift(1)
+    w = np.array([weights[4], weights[3], weights[2], weights[1], weights[0]], dtype=float)
 
-    df_10d['cwdi_i_p1'] = df_10d['cwdi_i'].shift(1)
-    df_10d['cwdi_i_p2'] = df_10d['cwdi_i'].shift(2)
-    df_10d['cwdi_i_p3'] = df_10d['cwdi_i'].shift(3)
-    df_10d['cwdi_i_p4'] = df_10d['cwdi_i'].shift(4)
-    df_10d['cwdi_i_p5'] = df_10d['cwdi_i'].shift(5)
+    def _cwdi_window(etc_window):
+        '''
+        滑窗计算CWDI
+        '''
+        p_window = p_shift.loc[etc_window.index].values
+        etc_vals = etc_window.values
+        if len(etc_vals) < 50:
+            return np.nan
+        etc_blocks = etc_vals.reshape(5, 10)
+        p_blocks = p_window.reshape(5, 10)
+        etc_sum = etc_blocks.sum(axis=1)
+        p_sum = p_blocks.sum(axis=1)
+        cond = (etc_sum > 0) & (etc_sum >= p_sum)
+        cwdi_blocks = np.zeros(5, dtype=float)
+        cwdi_blocks[cond] = (1 - p_sum[cond] / etc_sum[cond]) * 100.0
+        return float(np.dot(w, cwdi_blocks))
 
-    # 对前1~5个10日不足进行加权求CWDI
-    df_10d['CWDI'] = (weights[0] * df_10d['cwdi_i_p1'] + weights[1] * df_10d['cwdi_i_p2'] + weights[2] * df_10d['cwdi_i_p3'] +
-                      weights[3] * df_10d['cwdi_i_p4'] + weights[4] * df_10d['cwdi_i_p5'])
-
-    df_cwdi_i_daily = df_10d[['cwdi_i']].reindex(df.index, method='ffill')  # 回填到日尺度便于后续筛选
-    df = df.join(df_cwdi_i_daily)
-
-    df_cwdi_daily = df_10d[['CWDI']].reindex(df.index, method='ffill')  # 回填到日尺度
-    df = df.join(df_cwdi_daily)
-
+    df['CWDI'] = etc_shift.rolling(window=50).apply(_cwdi_window, raw=False)
     return df
 
 
@@ -167,24 +168,30 @@ class SoybeanDisasterZoning:
         cfg = params.get('config', {})
         data_dir = cfg.get('inputFilePath')
         station_file = cfg.get('stationFilePath')
+
         dm = DataManager(data_dir, station_file, multiprocess=False, num_processes=1)
         station_ids = list(station_coords.keys())
         if not station_ids:
             station_ids = dm.get_all_stations()
         available = set(dm.get_all_stations())
+
         station_ids = [sid for sid in station_ids if sid in available]
         start_date = cfg.get('startDate')
         end_date = cfg.get('endDate')
         station_values: Dict[str, float] = {}
+
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self.drought_station_g(daily, cwdi_config)
             station_values[sid] = float(g) if np.isfinite(g) else np.nan
+
         interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
         iparams = interp_conf.get('params', {})
+
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'
+
         interp_data = {
             'station_values': station_values,
             'station_coords': station_coords,
@@ -193,10 +200,19 @@ class SoybeanDisasterZoning:
             'area_code': cfg.get('areaCode'),
             'shp_path': cfg.get('shpFilePath')
         }
+
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
+
+        # 分级
+        class_conf = algorithm_config.get('classification', {})
+        if class_conf:
+            algos = params.get('algorithms', {})
+            key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
+            if key in algos:
+                result['data'] = algos[key].execute(result['data'], class_conf)
 
         return {
             'data': result['data'],
