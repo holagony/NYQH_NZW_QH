@@ -14,9 +14,9 @@
   "demFilePath": "C:\\Users\\mjynj\\Desktop\\NYQH\\depend\\dem\\china_dem.tif",
   "shpFilePath": "C:\\Users\\mjynj\\Desktop\\NYQH\\depend\\shp\\150000_wgs84.shp",
   "otherFilesPath": "",
-  "resultLogPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\CWDI\\log.json",
-  "resultJsonPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\CWDI\\result.json",
-  "resultFlowPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\CWDI\\flow.json",
-  "resultPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\CWDI",
+  "resultLogPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\NYQH_SOYBEAN\\ZH_drought\\resultLogFile.json",
+  "resultJsonPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\NYQH_SOYBEAN\\ZH_drought\\resultJsonFile.json",
+  "resultFlowPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\NYQH_SOYBEAN\\ZH_drought\\resultFlowFile.json",
+  "resultPath": "C:\\Users\\mjynj\\Desktop\\NYQH\\output\\NYQH_SOYBEAN\\ZH_drought",
   "algorithmConfig": {}
 }

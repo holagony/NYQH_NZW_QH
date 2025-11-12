@@ -88,7 +88,15 @@ def calculate_cwdi(daily_data, kc, weights, lat_deg=None, elev_m=None):
             elev_m = float(df['altitude'].iloc[0])
         df['ET0'] = penman_et0(df, lat_deg, elev_m)
 
-    df['ETc'] = kc * df['ET0']
+    years = df.index.year.unique()
+    kc_series = pd.Series(0.0, index=df.index)
+    for y in years:
+        kc_series[(df.index >= pd.Timestamp(y, 5, 12)) & (df.index <= pd.Timestamp(y, 5, 25))] = 0.32
+        kc_series[(df.index >= pd.Timestamp(y, 5, 26)) & (df.index <= pd.Timestamp(y, 6, 23))] = 0.51
+        kc_series[(df.index >= pd.Timestamp(y, 6, 24)) & (df.index <= pd.Timestamp(y, 7, 4))] = 0.69
+        kc_series[(df.index >= pd.Timestamp(y, 7, 5)) & (df.index <= pd.Timestamp(y, 8, 25))] = 1.15
+        kc_series[(df.index >= pd.Timestamp(y, 8, 26)) & (df.index <= pd.Timestamp(y, 9, 18))] = 0.5
+    df['ETc'] = kc_series * df['ET0']
     etc_shift = df['ETc'].shift(1)
     p_shift = df['P'].shift(1)
     w = np.array([weights[4], weights[3], weights[2], weights[1], weights[0]], dtype=float)
