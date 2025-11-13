@@ -188,6 +188,7 @@ class SoybeanDisasterZoning:
         end_date = cfg.get('endDate')
         station_values: Dict[str, float] = {}
 
+        # 读取数据和计算
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self.drought_station_g(daily, cwdi_config)

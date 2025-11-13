@@ -1,0 +1,22 @@
+{
+  "taskId": "123456",
+  "algoFrom": "zoning_150000_soybean_ZH",
+  "cropCode": "soybean",
+  "zoningType": "ZH",
+  "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
+  "areaCode": "150000",
+  "areaName": "内蒙古自治区",
+  "element": "drought",
+  "startDate": "19910101",
+  "endDate": "20201231",
+  "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/150000_30grid_wgs84.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/150000_wgs84.shp",
+  "otherFilesPath": "",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SOYBEAN/ZH_drought/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SOYBEAN/ZH_drought/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SOYBEAN/ZH_drought/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SOYBEAN/ZH_drought",
+  "algorithmConfig": {}
+}
