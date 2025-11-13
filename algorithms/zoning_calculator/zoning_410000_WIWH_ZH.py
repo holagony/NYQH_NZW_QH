@@ -88,14 +88,11 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
             elev_m = float(df['altitude'].iloc[0])
         df['ET0'] = penman_et0(df, lat_deg, elev_m)
 
-    years = df.index.year.unique()
     kc_series = pd.Series(0.0, index=df.index)
-    for y in years:
-        kc_series[(df.index >= pd.Timestamp(y, 5, 12)) & (df.index <= pd.Timestamp(y, 5, 25))] = 0.32
-        kc_series[(df.index >= pd.Timestamp(y, 5, 26)) & (df.index <= pd.Timestamp(y, 6, 23))] = 0.51
-        kc_series[(df.index >= pd.Timestamp(y, 6, 24)) & (df.index <= pd.Timestamp(y, 7, 4))] = 0.69
-        kc_series[(df.index >= pd.Timestamp(y, 7, 5)) & (df.index <= pd.Timestamp(y, 8, 25))] = 1.15
-        kc_series[(df.index >= pd.Timestamp(y, 8, 26)) & (df.index <= pd.Timestamp(y, 9, 18))] = 0.5
+    m = df.index.month
+    kc_map = {10: 0.67, 11: 0.70, 12: 0.74, 1: 0.64, 2: 0.64, 3: 0.90, 4: 1.22, 5: 1.13, 6: 0.83}
+    for mo, v in kc_map.items():
+        kc_series[m == mo] = v
     df['ETc'] = kc_series * df['ET0']
     etc_shift = df['ETc'].shift(1)
     p_shift = df['P'].shift(1)
@@ -122,12 +119,13 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     return df
 
 
-class SPSO_ZH:
+class WIWH_ZH:
     '''
-    内蒙古-大豆-灾害区划
-    干旱和霜冻
-    干旱--目前是生成危险性G的tif，其他风险区划的样例数据暂未提供
-    霜冻 TODO
+    河南-冬小麦-灾害区划
+    干旱区划
+    晚霜冻气候区划 TODO
+    麦收区连阴雨气候区划 TODO
+    干热风区划 TODO
     '''
 
     def drought_station_g(self, data, config):
@@ -135,10 +133,13 @@ class SPSO_ZH:
         计算每个站点的干旱风险性G
         '''
         df = calculate_cwdi(data, config.get("weights", [0.3, 0.25, 0.2, 0.15, 0.1]), config.get("lat_deg"), config.get("elev_m"))
+
+        # 根据输入参数mask数据
         series = df["CWDI"] if "CWDI" in df.columns else pd.Series(dtype=float)
         start_date_str = config.get("start_date")
         end_date_str = config.get("end_date")
         year_offset = int(config.get("year_offset", 0))
+
         if start_date_str and end_date_str and not series.empty:
             years = series.index.year.unique()
             masks = []
@@ -151,19 +152,34 @@ class SPSO_ZH:
                 for m in masks[1:]:
                     mask = mask | m
                 series = series[mask]
+
         if series.empty:
             return np.nan
+
         years = sorted(series.index.year.unique())
-        n = len(years) if years else 0
-        if n == 0:
+        if not years:
             return np.nan
-        light = ((series >= 35) & (series < 45)).sum()
-        medium = ((series >= 45) & (series < 55)).sum()
-        heavy = (series >= 55).sum()
-        w_light = light / n
-        w_medium = medium / n
-        w_heavy = heavy / n
-        return float(0.15 * w_light + 0.35 * w_medium + 0.5 * w_heavy)
+
+        # 河南报告P49
+        weights = np.array([0.09, 0.13, 0.11, 0.12, 0.20, 0.22, 0.13], dtype=float)
+        vals = []
+        for y in years:
+            ranges = [(pd.Timestamp(y - 1, 8, 1), pd.Timestamp(y - 1, 10, 10)), (pd.Timestamp(y - 1, 10, 11), pd.Timestamp(y - 1, 12, 20)),
+                      (pd.Timestamp(y - 1, 12, 21), pd.Timestamp(y, 2, 20)), (pd.Timestamp(y, 2, 21), pd.Timestamp(y, 3, 31)),
+                      (pd.Timestamp(y, 4, 1), pd.Timestamp(y, 4, 30)), (pd.Timestamp(y, 5, 1), pd.Timestamp(y, 5, 20)),
+                      (pd.Timestamp(y, 5, 21), pd.Timestamp(y, 6, 10))]
+
+            means = []
+            for s, e in ranges:
+                seg = series[(series.index >= s) & (series.index <= e)]
+                means.append(float(seg.mean()) if len(seg) > 0 else np.nan)
+
+            m = np.array(means, dtype=float)
+            vals.append(float(np.nansum(weights * m)))
+
+        total = float(sum(vals))
+
+        return total / float(len(years))
 
     def calculate_drought(self, params):
         '''
@@ -212,7 +228,7 @@ class SPSO_ZH:
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
-
+        
         # 输出result的数值范围
         data_min = float(np.nanmin(result['data']))
         data_max = float(np.nanmax(result['data']))
@@ -234,7 +250,7 @@ class SPSO_ZH:
                 'transform': result['meta']['transform'],
                 'crs': result['meta']['crs']
             },
-            'type': '内蒙古大豆干旱'
+            'type': '河南冬小麦干旱'
         }
 
     def calculate_freeze(self, params):
@@ -244,12 +260,30 @@ class SPSO_ZH:
         '''
         pass
 
+    def calculate_dry(self, params):
+        '''
+        干热风区划
+        计算代码写这里
+        '''
+        pass
+
+    def calculate_wet(self, params):
+        '''
+        麦收区连阴雨气候区划
+        计算代码写这里
+        '''
+        pass
+
     def calculate(self, params):
         config = params['config']
         disaster_type = config['element']
         if disaster_type == 'drought':
             return self.calculate_drought(params)
-        elif disaster_type == 'freeze':
+        elif disaster_type == 'freeze':  # 晚霜冻
             return self.calculate_freeze(params)
+        elif disaster_type == 'dry':  # 干热风
+            return self.calculate_dry(params)
+        elif disaster_type == 'wet':  # 麦收区连阴雨
+            return self.calculate_wet(params)
         else:
             raise ValueError(f"不支持的灾害类型: {disaster_type}")

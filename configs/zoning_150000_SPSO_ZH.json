@@ -2,7 +2,6 @@
     "drought": {
         "indicators": {},
         "cwdi": {
-            "indicators": {},
             "weights": [
                 0.3,
                 0.25,

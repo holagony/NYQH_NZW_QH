@@ -11,7 +11,7 @@
   "endDate": "20201231",
   "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
   "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/150000_30grid_wgs84.tif",
-  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_150000.tif",
   "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/150000_wgs84.shp",
   "otherFilesPath": "",
   "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SOYBEAN/ZH_drought/resultLogFile.json",
