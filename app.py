@@ -64,6 +64,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 1:
             jsonPath = sys.argv[1]
     except:
-        jsonPath=r"C:\Users\mjynj\Desktop\NYQH\NYQH_NZW_QH\inputJson_soybean_ZH_drought.json"
+        jsonPath="/mnt/PRESKY/user/wuyujie/yanfa/NYQH/NYQH_NZW_QH/inputJson_wheat_PZ.json"
+
     # 调用
     sys.exit(app(jsonPath))

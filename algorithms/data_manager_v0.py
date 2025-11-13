@@ -89,78 +89,25 @@ class DataManager:
         except Exception as e:
             print(f"保存中间CSV结果失败: {str(e)}")
     
-    # def _print_indicator_stats(self, results_df: pd.DataFrame, indicator_configs: Dict[str, Any]) -> None:
-    #     """打印指标统计信息"""
-    #     indicator_names = list(indicator_configs.keys())
-        
-    #     print("指标计算结果统计:")
-    #     for indicator in indicator_names:
-    #         if indicator in results_df.columns:
-    #             values = results_df[indicator]
-    #             # valid_values = values.dropna()
-
-    #             # 处理不同类型的数据
-    #             valid_values = []
-    #             for val in values:
-                    
-    #                 if isinstance(val, (int, float)) and not np.isnan(val):
-    #                     # lta 数据：数值类型
-    #                     valid_values.append(val)                    
-    #                 else:
-    #                     # yearly 数据：字典类型，提取所有年份的值
-    #                     yearly_values = [v for v in val.values() if not np.isnan(v)]
-    #                     valid_values.append(np.nanmean(yearly_values))
-                        
-    #                     # 其他情况（如字符串、None等）跳过
-    #             valid_values = np.array(valid_values)
-    #             if len(valid_values) > 0:
-    #                 min_val = valid_values.min()
-    #                 max_val = valid_values.max()
-    #                 mean_val = valid_values.mean()
-    #                 valid_count = len(valid_values)
-    #                 print(f"  {indicator}: 有效值{valid_count}个, 范围[{min_val:.2f}, {max_val:.2f}], 均值{mean_val:.2f}")
-    #             else:
-    #                 print(f"  {indicator}: 无有效值")
-
     def _print_indicator_stats(self, results_df: pd.DataFrame, indicator_configs: Dict[str, Any]) -> None:
-        """打印指标统计信息 - 适配 yearly 和 lta 数据类型"""
+        """打印指标统计信息"""
         indicator_names = list(indicator_configs.keys())
         
         print("指标计算结果统计:")
         for indicator in indicator_names:
             if indicator in results_df.columns:
                 values = results_df[indicator]
-                
-                # 处理不同类型的数据
-                valid_values = []
-                for val in values:
-                    if isinstance(val, dict):
-                        # yearly 数据：字典类型，提取所有年份的值
-                        yearly_values = [v for v in val.values() if not np.isnan(v)]
-                        valid_values.extend(yearly_values)
-                    elif isinstance(val, (int, float)) and not np.isnan(val):
-                        # lta 数据：数值类型
-                        valid_values.append(val)
-                    # 其他情况（如字符串、None等）跳过
-                
+                valid_values = values.dropna()
                 if len(valid_values) > 0:
-                    min_val = min(valid_values)
-                    max_val = max(valid_values)
-                    mean_val = sum(valid_values) / len(valid_values)
+                    min_val = valid_values.min()
+                    max_val = valid_values.max()
+                    mean_val = valid_values.mean()
                     valid_count = len(valid_values)
-                    
-                    # 获取数据类型信息
-                    data_type = "混合"
-                    sample_value = values.iloc[0] if len(values) > 0 else None
-                    if isinstance(sample_value, dict):
-                        data_type = f"逐年数据({len(sample_value)}年)"
-                    elif isinstance(sample_value, (int, float)):
-                        data_type = "多年平均"
-                    
-                    print(f"  {indicator}[{data_type}]: 有效值{valid_count}个, 范围[{min_val:.2f}, {max_val:.2f}], 均值{mean_val:.2f}")
+                    print(f"  {indicator}: 有效值{valid_count}个, 范围[{min_val:.2f}, {max_val:.2f}], 均值{mean_val:.2f}")
                 else:
                     print(f"  {indicator}: 无有效值")
-                    
+
+    
     def calculate_indicators_for_stations_optimized(self, station_ids: List[str], indicator_configs: Dict[str, Any],
                                                   start_date: str = None, end_date: str = None,
                                                   output_csv: str = None) -> pd.DataFrame:

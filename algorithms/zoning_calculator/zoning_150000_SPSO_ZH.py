@@ -76,7 +76,7 @@ def penman_et0(daily_data, lat_deg, elev_m, albedo=0.23, as_coeff=0.25, bs_coeff
     return et0.clip(lower=0)
 
 
-def calculate_cwdi(daily_data, kc, weights, lat_deg=None, elev_m=None):
+def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     df = daily_data.copy()
     if 'P' not in df.columns and 'precip' in df.columns:
         df = df.rename(columns={'precip': 'P'})
@@ -122,7 +122,7 @@ def calculate_cwdi(daily_data, kc, weights, lat_deg=None, elev_m=None):
     return df
 
 
-class SoybeanDisasterZoning:
+class SPSO_ZH:
     '''
     内蒙古-大豆-灾害区划
     干旱和霜冻
@@ -134,8 +134,7 @@ class SoybeanDisasterZoning:
         '''
         计算每个站点的干旱风险性G
         '''
-        df = calculate_cwdi(data, float(config.get("kc", 0.8)), config.get("weights", [0.3, 0.25, 0.2, 0.15, 0.1]), config.get("lat_deg"),
-                            config.get("elev_m"))
+        df = calculate_cwdi(data, config.get("weights", [0.3, 0.25, 0.2, 0.15, 0.1]), config.get("lat_deg"), config.get("elev_m"))
         series = df["CWDI"] if "CWDI" in df.columns else pd.Series(dtype=float)
         start_date_str = config.get("start_date")
         end_date_str = config.get("end_date")
@@ -188,7 +187,6 @@ class SoybeanDisasterZoning:
         end_date = cfg.get('endDate')
         station_values: Dict[str, float] = {}
 
-        # 读取数据和计算
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self.drought_station_g(daily, cwdi_config)
@@ -237,6 +235,7 @@ class SoybeanDisasterZoning:
     def calculate_freeze(self, params):
         '''
         霜冻区划
+        计算代码写这里
         '''
         pass
 

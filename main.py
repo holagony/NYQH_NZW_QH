@@ -51,7 +51,7 @@ if __name__ == "__main__":
         json_path = sys.argv[1]
     else:
         # 默认配置文件路径
-        json_path = "inputJson_HN_PZ.json"
+        json_path = "inputJson_wheat_PZ.json"
     
     # 读取json文件
     obj = JsonTool()

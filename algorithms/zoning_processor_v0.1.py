@@ -49,7 +49,7 @@ class ZoningProcessor:
         self.area_code = self.config.get("areaCode", "150000")
         self.area_name = self.config.get("areaName", "内蒙古自治区")
         self.crop_code = self.config.get("cropCode", "soybean")
-        self.zoning_type = self.config.get("zoningType", "BC")
+        self.zoning_type = self.config.get("zoningType", "BH")
         self.element = self.config.get("element", "sclerotinia")
 
         # 新增：算法来源参数，用于控制算法模块和配置文件
@@ -324,10 +324,10 @@ class ZoningProcessor:
         # 根据 algoFrom 确定计算器名称
         if self.algo_from:
             calculator_name = self.algo_from
-            print(f"使用配置算法: {calculator_name}")
+            print(f"使用跨区域计算器: {calculator_name}")
         else:
             calculator_name = f"zoning_{self.area_code}_{self.crop_code}_{self.zoning_type}"
-            print(f"使用默认算法: {calculator_name}")
+            print(f"使用默认计算器: {calculator_name}")
         
         module_path = f"algorithms.zoning_calculator.{calculator_name}"
         
@@ -337,8 +337,7 @@ class ZoningProcessor:
             self.fjson.log(f"模块导入成功: {module_path}")
             
             # 获取计算器类名
-            class_name = f"{self.crop_code}_{self.zoning_type}"
-            # self._get_calculator_class_name()
+            class_name = self._get_calculator_class_name()
             self.fjson.log(f"查找计算器类: {class_name}")
             
             # 获取计算器类
@@ -376,26 +375,24 @@ class ZoningProcessor:
             self.fjson.log(f"计算器执行异常: {str(e)}")
             raise
 
-    # def _get_calculator_class_name(self) -> str:
-    #     """获取计算器类名 - 支持跨区域计算"""
-    #     # crop_name = self.crop_code.capitalize()
-    #     # crop_name = self.crop_code
-    #     # type_name = self.zoning_type
-    #     # # 更详细的类名映射
-    #     # class_name_map = {
-    #     #     "BC": f"{crop_name}_PestZoning",           # 病虫害区划
-    #     #     "ZZ": f"{crop_name}_PlantingZoning",       # 种植区划  
-    #     #     "PZ": f"{crop_name}_QualityZoning",        # 品质区划
-    #     #     "CL": f"{crop_name}_YieldZoning",          # 产量区划
-    #     #     "ZH": f"{crop_name}_DisasterZoning",       # 气象灾害区划
-    #     #     # "QH": f"{crop_name}ComprehensiveZoning",  # 综合区划
-    #     # }
-
-    #     # class_name = class_name_map.get(self.zoning_type, f"{crop_name}Zoning")
-    #     class_name = f"{self.crop_code}_{self.zoning_type}"
-    #     self.fjson.log(f"类名映射: {self.zoning_type} -> {class_name}")
+    def _get_calculator_class_name(self) -> str:
+        """获取计算器类名 - 支持跨区域计算"""
+        crop_name = self.crop_code.capitalize()
         
-    #     return class_name     
+        # 更详细的类名映射
+        class_name_map = {
+            "BH": f"{crop_name}PestZoning",           # 病虫害区划
+            "ZZ": f"{crop_name}PlantingZoning",       # 种植区划  
+            "PZ": f"{crop_name}QualityZoning",        # 品质区划
+            "CL": f"{crop_name}YieldZoning",          # 产量区划
+            "ZH": f"{crop_name}DisasterZoning",       # 气象灾害区划
+            "QH": f"{crop_name}ComprehensiveZoning",  # 综合区划
+        }
+
+        class_name = class_name_map.get(self.zoning_type, f"{crop_name}Zoning")
+        self.fjson.log(f"类名映射: {self.zoning_type} -> {class_name}")
+        
+        return class_name     
 
     def _fallback_to_generic_calculator(self, indicators_data: Dict[str, Any], station_coords: Dict[str, Any]) -> Dict[str, Any]:
         """备用通用计算器"""
@@ -428,8 +425,7 @@ class ZoningProcessor:
         
         # 保存TIFF文件
         self._save_geotiff(zoning_result['data'], zoning_result['meta'], tif_path)
-        
-        exit(0)
+        #exit(0)
         # 生成PNG专题图
         png_filename = self._generate_output_filename("png")
         png_path = os.path.join(self.result_path, png_filename)
@@ -487,12 +483,11 @@ class ZoningProcessor:
     def _get_factor_code(self, element: str) -> str:
         """获取因子代码"""
         factor_codes = {
-            "DBZHL": "002",
-            "CZFHL": "019",
-            "JHB": "015",
-            "SXC": "011", 
-            "GH": "005",
-            "SD":"017"
+            "protein": "001",
+            "fat": "002",
+            "sclerotinia": "101",
+            "bean_moth": "102", 
+            "high_temperature": "201"
         }
         return factor_codes.get(element, "000")
     
@@ -543,19 +538,27 @@ class ZoningProcessor:
     def _generate_qgis_map(self, resultfile: str, output_png: str) -> bool:
         """调用QGIS绘制专题图"""
         try:
+
+            from qgis_src.qgis_plot import main as main_plot
+            
+            rasterStyle=os.path.join(os.getcwd(),"qgis_src","auxpath","colorbar",str(self.zoning_type+".qml"))
+            #print(rasterStyle)
+            template=os.path.join(os.getcwd(),"qgis_src","auxpath","template","template.qgs")
+            #print(template)
             json_params = {
                 "resultfile": resultfile,
                 "output": output_png,
+                "rasterStyle": rasterStyle,
+                "template":template,
                 "areacode": self.area_code,
                 "areaname": self.area_name,
                 "cropname": self.crop_code,
                 "zoningtype": self.zoning_type,
+                "element":self.element,
                 "startdate": self.start_date,
                 "enddate": self.end_date
             }
-            
-            # from qgis_src.main import main as main_plot
-            # main_plot(json_params)
+            main_plot(json_params["resultfile"],json_params["output"],json_params["rasterStyle"],json_params["template"],json_params["areacode"],json_params["areaname"],json_params["cropname"],json_params["zoningtype"],json_params["element"],json_params["startdate"],json_params["enddate"])
             return True
         except Exception as e:
             self.fjson.log(f"调用QGIS绘图失败: {str(e)}")

@@ -24,7 +24,7 @@
                 "conditions": [
                     {
                         "variable": "precip",
-                        "operator": ">=0.1",
+                        "operator": ">=",
                         "value": 0.1
                     }
                 ]
@@ -35,31 +35,32 @@
                 "start_date": "05-01",
                 "end_date": "06-10",
                 "variable": "tavg"
-            },
-            "formula": {
-                "type": "custom_formula",
-                "formula": "9.662 + 0.226* X1 - 0.117 * X2 - 0.25 * X3 + 0.004 * X4",
-                "variables": {
-                    "X1": {
-                        "ref": "Tmax"
-                    },
-                    "X2": {
-                        "ref": "Pred"
-                    },
-                    "X3": {
-                        "ref": "Tmin"
-                    },
-                    "X4": {
-                        "ref": "AT10"
-                    }
-                }
-            },
-            "interpolation": {
-                "method": "idw"
-            },
-            "classification": {
-                "method": "equal_interval"
             }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "9.662 + 0.226* X1 - 0.117 * X2 - 0.25 * X3 + 0.004 * X4",
+            "variables": {
+                "X1": {
+                    "ref": "Tmax"
+                },
+                "X2": {
+                    "ref": "Pred"
+                },
+                "X3": {
+                    "ref": "Tmin"
+                },
+                "X4": {
+                    "ref": "AT10"
+                }
+            }
+        },
+        "interpolation": {
+            "order": "before",
+            "method": "idw"
+        },
+        "classification": {
+            "method": "equal_interval"
         }
     }
 }

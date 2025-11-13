@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, Any
 import importlib
 
-class SoybeanPestZoning:
+class SPSO_PestZoning:
     """内蒙古大豆病虫害区划计算器"""
     
     def __init__(self):
