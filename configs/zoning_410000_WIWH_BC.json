@@ -1,0 +1,299 @@
+{
+    "CMB": {
+        "indicators": {
+            "P1": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "04-01",
+                "end_date": "04-05",
+                "variable": "precip"
+            },
+            "P8": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "05-11",
+                "end_date": "05-15",
+                "variable": "precip"
+            },
+            "P10": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "05-21",
+                "end_date": "05-25",
+                "variable": "precip"
+            },
+            "H1": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "04-01",
+                "end_date": "04-05",
+                "variable": "sunshine"
+            },
+            "H3": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "04-16",
+                "end_date": "04-20",
+                "variable": "sunshine"
+            },
+            "H8": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "05-11",
+                "end_date": "05-15",
+                "variable": "sunshine"
+            },
+            "Pd3": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "04-11",
+                "end_date": "04-15",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": ">=",
+                        "value": 0.1
+                    }
+                ]
+            },
+            "City": {"variable": "city"}
+        },
+        "formula_north": {
+            "type": "custom_formula",
+            "formula": "10.732+0.452*P1-0.982*H8-0.74*H3-0.111*P8",
+            "variables": {
+                "P1": {
+                    "ref": "P1"
+                },
+                "H8": {
+                    "ref": "H8"
+                },
+                "H3": {
+                    "ref": "H3"
+                },
+                "P8": {
+                    "ref": "P8"
+                }
+            }
+        },
+        "formula_south": {
+            "type": "custom_formula",
+            "formula": "-6.232+0.226*P1+0.139*P10-2.458*Pd3+1.666*H1",
+            "variables": {
+                "P1": {
+                    "ref": "P1"
+                },
+                "P10": {
+                    "ref": "P10"
+                },
+                "Pd3": {
+                    "ref": "Pd3"
+                },
+                "H1": {
+                    "ref": "H1"
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "custom_thresholds",
+            "thresholds": [
+            {"min": "","max": 20, "level": 4, "label": "低风险"},
+            {"min": 20, "max": 30, "level": 3, "label": "中风险"},
+            {"min": 30, "max": 40, "level": 2, "label": "高风险"},
+            {"min": 40, "max": "","level": 1, "label": "极高风险"}
+            ]
+        }
+    },
+    "SMJHL": {
+        "indicators": {
+            "Tmax": {
+                "type": "period_extreme",
+                "extreme_type": "max",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "variable": "tmax"
+            },
+            "Tmean": {
+                "type": "period_mean",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "variable": "tavg"
+            },
+            "Pred": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": ">=",
+                        "value": 0.1
+                    }
+                ]
+            },
+            "RH": {
+                "type": "period_mean",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "variable": "rhum"
+            },
+            "N32": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "tmax",
+                        "operator": ">=",
+                        "value": 32
+                    }
+                ]
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "15.537 + 1.652 * X1 - 1.179 * X2 - 0.316 * X3 - 0.115 * X4 - 0.286 * X5",
+            "variables": {
+                "X1": {
+                    "ref": "Tmax"
+                },
+                "X2": {
+                    "ref": "Tmean"
+                },
+                "X3": {
+                    "ref": "Pred"
+                },
+                "X4": {
+                    "ref": "RH"
+                },
+                "X5": {
+                    "ref": "N32"
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "equal_interval",
+            "num_classes": 4
+        }
+    },
+    "MTWDSJ": {
+        "indicators": {
+            "AT10": {
+                "type": "growing_degree_days",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "variable": "tavg"
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "-1.559+0.008 * X1",
+            "variables": {
+                "X1": {
+                    "ref": "AT10"
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "equal_interval",
+            "num_classes": 4
+        }
+    },
+    "ZLRZ": {
+        "indicators": {
+            "Pred": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": ">=",
+                        "value": 0.1
+                    }
+                ]
+            },
+            "N20-22": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "tavg",
+                        "operator": "between",
+                        "value": [20, 22]
+                    }
+                ]
+            },
+            "AT10": {
+                "type": "growing_degree_days",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10"
+            },
+            "Tmin": {
+                "type": "period_extreme",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "variable": "tmin"
+            },
+            "Ra": {
+                "type": "total_radiation",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "06-10"
+            }
+         },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "833.3 - 2.953 * X1 + 1.757 * X2 + 0.086 * X3 - 3.63 * X4 - 0.056 * X5",
+            "variables": {
+                "X1": {
+                    "ref": "Pred"
+                },
+                "X2": {
+                    "ref": "N20-22"
+                },
+                "X3": {
+                    "ref": "AT10"
+                },
+                "X4": {
+                    "ref": "Tmin"
+                },
+                "X5": {
+                    "ref": "Ra"
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "equal_interval",
+            "num_classes": 4
+        }
+    }
+}
+

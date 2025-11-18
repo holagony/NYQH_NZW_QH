@@ -1,12 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov 14 15:12:07 2025
+
+@author: HTHT
+"""
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any,Optional
 from math import pi
 from algorithms.data_manager import DataManager
 from algorithms.interpolation.idw import IDWInterpolation
 from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
-
-
+import os
+from osgeo import gdal
+from scipy.ndimage import sobel
 def _sat_vapor_pressure(T):
     return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa)，T为气温(°C)
 
@@ -120,7 +128,52 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
 
     df['CWDI'] = etc_shift.rolling(window=50).apply(_cwdi_window, raw=False)
     return df
-
+#霜冻致灾危险性指标
+def calculate_W(daily_data):
+    df = daily_data.copy()
+    TMIN=df["tmin"]
+    frost1= TMIN[((TMIN.index.month<7)&(TMIN<(-1))&(TMIN>=(-2)))|((TMIN.index.month>=7)&(TMIN>=0)&(TMIN<0.5))]  #轻霜冻 
+    frost2=TMIN[((TMIN.index.month<7)&(TMIN<(-2))&(TMIN>=(-3)))|((TMIN.index.month>=7)&(TMIN>=(-1))&(TMIN<0))]  #中霜冻
+    frost3=TMIN[((TMIN.index.month<7)&(TMIN<(-3))&(TMIN>=(-4.5)))|((TMIN.index.month>=7)&(TMIN>=(-2.5))&(TMIN<(-1)))]  #重霜冻
+    #年数、日最低气温中间值
+    years=len(TMIN.index.year.unique())
+    frost1_median=frost1.sort_values().median()
+    frost2_median=frost2.sort_values().median()
+    frost3_median=frost3.sort_values().median()
+    #统计霜冻频次
+    frost1_num=frost_num(frost1)
+    frost2_num=frost_num(frost2)
+    frost3_num=frost_num(frost3)
+    
+    #计算Ih霜冻灾害强度频率指标
+    Ih=(frost1_num*frost1_median+frost2_num*frost2_median+frost3_num*frost3_median)/years
+    
+    #霜冻发生日期变异系数Dv
+    frost=pd.concat([frost1,frost2,frost3])
+    day_of_year = frost.index.dayofyear
+    mean_value = np.mean(day_of_year)
+    std_dev = np.std(day_of_year)
+    Dv=std_dev/mean_value
+    W=0.75*Ih+0.25*Dv
+    
+    
+    return W
+    
+def frost_num(frost):
+    df= frost.reset_index()
+    df.columns = ['date', 'tmin']   
+    df = df.sort_values(by='date')
+    
+    # 计算连续日期的差值
+    df['date_diff'] = df['date'].diff().dt.days
+    
+    # 标记新的霜冻事件
+    df['new_event'] = df['date_diff'] > 1
+    
+    # 计算霜冻事件的次数
+    frost_events = df['new_event'].cumsum().max() + 1     
+    return frost_events
+        
 
 class SPSO_ZH:
     '''
@@ -237,19 +290,155 @@ class SPSO_ZH:
             'type': '内蒙古大豆干旱'
         }
 
-    def calculate_freeze(self, params):
-        '''
-        霜冻区划
-        计算代码写这里
-        '''
-        pass
+    def _calculate_frost(self,params):
+        """霜冻灾害风险指数模型"""
+        station_coords = params.get('station_coords', {})
+        algorithm_config = params.get('algorithmConfig', {})
+        #W_config = algorithm_config.get('W', {})
+        cfg = params.get('config', {})
+        data_dir = cfg.get('inputFilePath')
+        station_file = cfg.get('stationFilePath')
+
+        dm = DataManager(data_dir, station_file, multiprocess=False, num_processes=1)
+        station_ids = list(station_coords.keys())
+        if not station_ids:
+            station_ids = dm.get_all_stations()
+        available = set(dm.get_all_stations())
+
+        station_ids = [sid for sid in station_ids if sid in available]
+        start_date = cfg.get('startDate')
+        end_date = cfg.get('endDate')
+        station_values: Dict[str, float] = {}
+
+        for sid in station_ids:
+            daily = dm.load_station_data(sid, start_date, end_date)
+            W = calculate_W(daily)
+            station_values[sid] = float(W) if np.isfinite(W) else np.nan        
+        
+        interp_conf = algorithm_config.get('interpolation', {})
+        method = str(interp_conf.get('method', 'idw')).lower()
+        iparams = interp_conf.get('params', {})
+
+        if 'var_name' not in iparams:
+            iparams['var_name'] = 'value'
+
+        interp_data = {
+            'station_values': station_values,
+            'station_coords': station_coords,
+            'grid_path': cfg.get('gridFilePath'),
+            'dem_path': cfg.get('demFilePath'),
+            'area_code': cfg.get('areaCode'),
+            'shp_path': cfg.get('shpFilePath')
+        }
+
+        if method == 'lsm_idw':
+            result = LSMIDWInterpolation().execute(interp_data, iparams)
+        else:
+            result = IDWInterpolation().execute(interp_data, iparams)
+    
+        interpolated_W_value=result["data"]     
+        #计算敏感性指数----------------------------------------------------
+        M_value=self.M(params)
+        #霜冻承灾体暴露度指数C(大豆种植面积比例栅格数据）----------------------
+        ZZ_percent_path = os.path.dirname(interp_data["grid_path"])[:-4]+"/ZZ_percent.tif"
+        ZZ_temp_path= os.path.dirname(interp_data["grid_path"])[:-4]+"/ZZ_temp.tif"
+        ZZ_temp_path=LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], ZZ_percent_path, ZZ_temp_path) 
+        in_ds_C=gdal.Open(ZZ_temp_path)
+        C_array= in_ds_C.GetRasterBand(1).ReadAsArray() #读取波段数据
+        Nodata=in_ds_C.GetRasterBand(1).GetNoDataValue()
+        C_array=np.where(C_array==Nodata,np.nan,C_array)
+        
+        
+        #霜冻防灾减灾能力指数F(灌溉面积百分比)------------------------
+        GG_percent_path=os.path.dirname(interp_data["grid_path"])[:-4]+"/GG_percent.tif"
+        GG_temp_path= os.path.dirname(interp_data["grid_path"])[:-4]+"/GG_temp.tif"
+        GG_temp_path=LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], GG_percent_path, GG_temp_path) 
+        in_ds_F=gdal.Open(GG_temp_path)
+        F_array= in_ds_F.GetRasterBand(1).ReadAsArray() #读取波段数据
+        Nodata=in_ds_F.GetRasterBand(1).GetNoDataValue()
+        F_array=np.where(F_array==Nodata,np.nan,F_array)        
+        #FRI--------------------------------------------------------
+        FRI=interpolated_W_value*0.593+C_array*0.255+M_value*0.106-F_array*0.046
+
+        #classification-----------------------------------------
+        class_conf = algorithm_config.get('classification', {})
+        key=f"classification.{class_conf.get('method', 'custom_thresholds')}"
+        classificator = params.get('algorithms', {})[key]    
+        # 执行
+        classdata = classificator.execute(FRI, class_conf) 
+        os.remove(ZZ_temp_path)
+        os.remove(GG_temp_path)                
+        return {
+            'data': classdata,
+            'meta': {
+                'width': result['meta']['width'],
+                'height': result['meta']['height'],
+                'transform': result['meta']['transform'],
+                'crs': result['meta']['crs']
+            },
+            'type': '内蒙古大豆霜冻'
+        }
+
+
+       
+
+        
+    def M(self,params):        
+        #环境敏感性指数
+        config = params['config']
+        dem_path=config.get("demFilePath","")
+        grid_path=config.get("gridFilePath","")
+        temp_path =  os.path.join(os.path.dirname(os.path.abspath(__file__)),'temp.tif')
+        aligned_dem = LSMIDWInterpolation()._align_datasets(grid_path, dem_path, temp_path)  
+        in_ds_dem=gdal.Open(aligned_dem)
+        gtt= in_ds_dem.GetGeoTransform()
+        alti_array= in_ds_dem.GetRasterBand(1).ReadAsArray() #读取波段数据
+        Nodata=in_ds_dem.GetRasterBand(1).GetNoDataValue()
+        #海拔----------------------
+        alti_array = np.where(alti_array==Nodata, np.nan, alti_array)  
+        #求纬度
+        width = in_ds_dem.RasterXSize    #cols
+        height = in_ds_dem.RasterYSize    #rows
+        x = np.linspace(gtt[0], gtt[0] + gtt[1]*width, width)
+        y = np.linspace(gtt[3], gtt[3] + gtt[5]*height, height)
+        lon, lat = np.meshgrid(x, y)
+        # 计算坡向aspect-------------------
+        # 使用Sobel算子计算水平和垂直方向的梯度
+        dz_dx = sobel(alti_array, axis=1) / (gtt[1]*111320 * np.cos(np.radians(lat)))
+        dz_dy = sobel(alti_array, axis=0) / (gtt[1]*111320 * np.cos(np.radians(lat)))
+        aspect = np.arctan2(dz_dy , dz_dx) 
+        aspect=np.where(alti_array==Nodata, np.nan, aspect)         
+        #赋值----------------------------
+        alti_array_=np.zeros_like(alti_array)
+        alti_array_=np.where(alti_array<200,1,alti_array_)
+        alti_array_=np.where((alti_array>=200)&(alti_array<400),2,alti_array_)
+        alti_array_=np.where((alti_array>=400)&(alti_array<600),3,alti_array_)
+        alti_array_=np.where((alti_array>=600)&(alti_array<800),4,alti_array_)     
+        alti_array_=np.where(alti_array>=800,5,alti_array_)
+        alti_array_=np.where(alti_array==Nodata, np.nan, alti_array_)
+        
+        aspect_=np.zeros_like(aspect)
+        aspect_=np.where((aspect>45)&(aspect<=135),1,aspect_)
+        aspect_=np.where((aspect>=135)&(aspect<225),2,aspect_)
+        aspect_=np.where((aspect>=225)&(aspect<315),3,aspect_)
+        aspect_=np.where((aspect>=315)&(aspect<=360),4,aspect_)     
+        aspect_=np.where(aspect<=45,5,aspect_)
+        aspect_=np.where(aspect==Nodata, np.nan, aspect_)
+        
+        M_value=0.833*alti_array_+0.167*aspect_
+        os.remove(aligned_dem)
+        return M_value
+                      
+        
+        
+
 
     def calculate(self, params):
         config = params['config']
         disaster_type = config['element']
         if disaster_type == 'drought':
             return self.calculate_drought(params)
-        elif disaster_type == 'freeze':
-            return self.calculate_freeze(params)
+        elif disaster_type == 'SD':
+            return self._calculate_frost(params)
         else:
             raise ValueError(f"不支持的灾害类型: {disaster_type}")

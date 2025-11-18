@@ -34,6 +34,7 @@ class IDWInterpolation():
             min_num = params.get('min_num', 10)
             first_size = params.get('first_size', 200)
             fill_nans = params.get('fill_nans', True)
+            grid_nodata = params.get('grid_nodata', 0)
             
             logger.info(f"开始IDW插值，站点数: {len(station_values)}")
             
@@ -55,7 +56,8 @@ class IDWInterpolation():
                 radius_dist=radius_dist,
                 min_num=min_num,
                 first_size=first_size,
-                fill_nans=fill_nans
+                fill_nans=fill_nans,
+                grid_nodata=grid_nodata
             )
             
             logger.info("IDW插值完成")
@@ -101,7 +103,7 @@ class IDWInterpolation():
     def _idw_interpolation_improved(self, stations_data: pd.DataFrame, grid_path: str,
                                   shp_path: str, area_code: str, var_name: str,
                                   radius_dist: float, min_num: int, first_size: int,
-                                  fill_nans: bool) -> Dict[str, Any]:
+                                  fill_nans: bool,grid_nodata: float) -> Dict[str, Any]:
         """改进的IDW插值算法"""
         temp_path = None
         aligned_grid = None
@@ -131,9 +133,10 @@ class IDWInterpolation():
                 dst_cols=cols,
                 radius_dist=radius_dist,
                 min_num=min_num,
-                first_size=first_size
+                first_size=first_size,
+                grid_nodata=grid_nodata
             )
-            
+
             result_array = idw_ds.ReadAsArray()
             
             # 填充NaN值
@@ -171,10 +174,144 @@ class IDWInterpolation():
                 except:
                     pass
     
+    # def _idw_interpolation_core(self, data: np.ndarray, latdata: np.ndarray, londata: np.ndarray,
+    #                           boundary_range: tuple, dst_epsg: int, dst_rows: int, dst_cols: int,
+    #                           radius_dist: float, min_num: int, first_size: int) -> gdal.Dataset:
+    #     """IDW插值核心算法"""
+    #     # 调整输出大小以避免内存溢出
+    #     if (dst_cols > first_size) or (dst_rows > first_size):
+    #         if dst_cols > dst_rows:
+    #             cols = first_size
+    #             rows = int(np.ceil(dst_rows / (dst_cols / first_size)))
+    #         else:
+    #             rows = first_size
+    #             cols = int(np.ceil(dst_cols / (dst_rows / first_size)))
+    #     else:
+    #         cols = dst_cols
+    #         rows = dst_rows
+    #
+    #     x_min, y_min, x_max, y_max = boundary_range
+    #
+    #     # 计算网格单元大小
+    #     x_cell = (x_max - x_min) / cols
+    #     y_cell = (y_max - y_min) / rows
+    #
+    #     # 计算网格中心坐标
+    #     x_centers = np.linspace(x_min + x_cell/2, x_max - x_cell/2, cols)
+    #     y_centers = np.linspace(y_max - y_cell/2, y_min + y_cell/2, rows)
+    #
+    #     # 创建输出数组
+    #     out_data = np.full((rows, cols), np.nan, dtype=np.float32)
+    #
+    #     # 创建内存数据集
+    #     driver = gdal.GetDriverByName("MEM")
+    #     out_ds = driver.Create("", cols, rows, 1, gdal.GDT_Float32)
+    #     out_ds.SetGeoTransform((x_min, x_cell, 0, y_max, 0, -y_cell))
+    #
+    #     # 设置投影
+    #     srs = osr.SpatialReference()
+    #     srs.ImportFromEPSG(dst_epsg)
+    #     out_ds.SetProjection(srs.ExportToWkt())
+    #
+    #     # 执行IDW插值
+    #     search_radius = radius_dist ** 2
+    #
+    #     logger.info(f"开始IDW插值，网格: {cols}x{rows}, 站点数: {len(data)}")
+    #
+    #     # 使用向量化计算提高性能
+    #     for i in range(rows):
+    #         y = y_centers[i]
+    #         dy2 = (latdata - y) ** 2
+    #
+    #         for j in range(cols):
+    #             x = x_centers[j]
+    #             dx2 = (londata - x) ** 2
+    #             distances = dx2 + dy2
+    #
+    #             # 找到搜索半径内的点
+    #             in_radius = distances < search_radius
+    #             valid_indices = in_radius & ~np.isnan(data)
+    #
+    #             valid_count = np.sum(valid_indices)
+    #
+    #             # 渐进式搜索：如果没有找到足够点，逐步扩大搜索半径
+    #             current_radius = search_radius
+    #             max_radius_multiplier = 4.0
+    #             radius_multiplier = 1.0
+    #
+    #             while valid_count < min_num and radius_multiplier <= max_radius_multiplier:
+    #                 radius_multiplier *= 2.0
+    #                 current_radius = search_radius * radius_multiplier
+    #                 in_radius = distances < current_radius
+    #                 valid_indices = in_radius & ~np.isnan(data)
+    #                 valid_count = np.sum(valid_indices)
+    #
+    #             if valid_count < min_num:
+    #                 # 如果仍然不足，选择最近的所有点
+    #                 dist_copy = distances.copy()
+    #                 dist_copy[~valid_indices] = np.inf
+    #                 if np.any(np.isfinite(dist_copy)):
+    #                     idx = np.argpartition(dist_copy, min(min_num-1, len(dist_copy)-1))[:min_num]
+    #                     valid_indices = np.zeros_like(distances, dtype=bool)
+    #                     valid_indices[idx] = True
+    #                     valid_count = min_num
+    #                 else:
+    #                     out_data[i, j] = np.nan
+    #                     continue
+    #
+    #             if valid_count == 0:
+    #                 out_data[i, j] = np.nan
+    #                 continue
+    #
+    #             # 提取有效数据
+    #             valid_values = data[valid_indices]
+    #             valid_distances = distances[valid_indices]
+    #
+    #             # 检查是否所有值相同
+    #             if np.all(valid_values == valid_values[0]):
+    #                 out_data[i, j] = valid_values[0]
+    #                 continue
+    #
+    #             # 计算IDW权重
+    #             with np.errstate(divide='ignore', invalid='ignore'):
+    #                 weights = 1.0 / (valid_distances + 1e-8)
+    #
+    #                 # 对距离为0的点（同一位置）给予最大权重
+    #                 zero_dist_mask = valid_distances == 0
+    #                 if np.any(zero_dist_mask):
+    #                     weights[zero_dist_mask] = 1e6
+    #
+    #             weights_sum = np.sum(weights)
+    #
+    #             if weights_sum > 0:
+    #                 idw_value = np.sum(weights * valid_values) / weights_sum
+    #                 out_data[i, j] = idw_value
+    #             else:
+    #                 # 如果权重和仍然为0，使用最近点的值
+    #                 min_idx = np.argmin(valid_distances)
+    #                 out_data[i, j] = valid_values[min_idx]
+    #
+    #     # 写入数据
+    #     out_band = out_ds.GetRasterBand(1)
+    #     out_band.WriteArray(out_data)
+    #     out_band.SetNoDataValue(np.nan)
+    #
+    #     # 重采样到目标尺寸
+    #     if cols != dst_cols or rows != dst_rows:
+    #         resampled_ds = gdal.Warp("", out_ds, format="MEM", width=dst_cols, height=dst_rows,
+    #                                resampleAlg=gdal.GRA_Bilinear, outputBounds=boundary_range)
+    #         out_ds = None
+    #         logger.info(f"IDW插值完成，重采样从 {cols}x{rows} 到 {dst_cols}x{dst_rows}")
+    #         return resampled_ds
+    #
+    #     logger.info("IDW插值完成")
+    #     return out_ds
+
     def _idw_interpolation_core(self, data: np.ndarray, latdata: np.ndarray, londata: np.ndarray,
-                              boundary_range: tuple, dst_epsg: int, dst_rows: int, dst_cols: int,
-                              radius_dist: float, min_num: int, first_size: int) -> gdal.Dataset:
-        """IDW插值核心算法"""
+                                boundary_range: tuple, dst_epsg: int, dst_rows: int, dst_cols: int,
+                                radius_dist: float, min_num: int, first_size: int,
+                                mask_grid_path: str = None, grid_nodata: float = -9999) -> gdal.Dataset:
+        """IDW插值核心算法 - 包含掩膜边界处理"""
         # 调整输出大小以避免内存溢出
         if (dst_cols > first_size) or (dst_rows > first_size):
             if dst_cols > dst_rows:
@@ -186,100 +323,100 @@ class IDWInterpolation():
         else:
             cols = dst_cols
             rows = dst_rows
-        
+
         x_min, y_min, x_max, y_max = boundary_range
-        
+
         # 计算网格单元大小
         x_cell = (x_max - x_min) / cols
         y_cell = (y_max - y_min) / rows
-        
+
         # 计算网格中心坐标
-        x_centers = np.linspace(x_min + x_cell/2, x_max - x_cell/2, cols)
-        y_centers = np.linspace(y_max - y_cell/2, y_min + y_cell/2, rows)
-        
+        x_centers = np.linspace(x_min + x_cell / 2, x_max - x_cell / 2, cols)
+        y_centers = np.linspace(y_max - y_cell / 2, y_min + y_cell / 2, rows)
+
         # 创建输出数组
         out_data = np.full((rows, cols), np.nan, dtype=np.float32)
-        
+
         # 创建内存数据集
         driver = gdal.GetDriverByName("MEM")
         out_ds = driver.Create("", cols, rows, 1, gdal.GDT_Float32)
         out_ds.SetGeoTransform((x_min, x_cell, 0, y_max, 0, -y_cell))
-        
+
         # 设置投影
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(dst_epsg)
         out_ds.SetProjection(srs.ExportToWkt())
-        
+
         # 执行IDW插值
         search_radius = radius_dist ** 2
-        
+
         logger.info(f"开始IDW插值，网格: {cols}x{rows}, 站点数: {len(data)}")
-        
+
         # 使用向量化计算提高性能
         for i in range(rows):
             y = y_centers[i]
             dy2 = (latdata - y) ** 2
-            
+
             for j in range(cols):
                 x = x_centers[j]
                 dx2 = (londata - x) ** 2
                 distances = dx2 + dy2
-                
+
                 # 找到搜索半径内的点
                 in_radius = distances < search_radius
                 valid_indices = in_radius & ~np.isnan(data)
-                
+
                 valid_count = np.sum(valid_indices)
-                
+
                 # 渐进式搜索：如果没有找到足够点，逐步扩大搜索半径
                 current_radius = search_radius
                 max_radius_multiplier = 4.0
                 radius_multiplier = 1.0
-                
+
                 while valid_count < min_num and radius_multiplier <= max_radius_multiplier:
                     radius_multiplier *= 2.0
                     current_radius = search_radius * radius_multiplier
                     in_radius = distances < current_radius
                     valid_indices = in_radius & ~np.isnan(data)
                     valid_count = np.sum(valid_indices)
-                
+
                 if valid_count < min_num:
                     # 如果仍然不足，选择最近的所有点
                     dist_copy = distances.copy()
                     dist_copy[~valid_indices] = np.inf
                     if np.any(np.isfinite(dist_copy)):
-                        idx = np.argpartition(dist_copy, min(min_num-1, len(dist_copy)-1))[:min_num]
+                        idx = np.argpartition(dist_copy, min(min_num - 1, len(dist_copy) - 1))[:min_num]
                         valid_indices = np.zeros_like(distances, dtype=bool)
                         valid_indices[idx] = True
                         valid_count = min_num
                     else:
                         out_data[i, j] = np.nan
                         continue
-                
+
                 if valid_count == 0:
                     out_data[i, j] = np.nan
                     continue
-                
+
                 # 提取有效数据
                 valid_values = data[valid_indices]
                 valid_distances = distances[valid_indices]
-                
+
                 # 检查是否所有值相同
                 if np.all(valid_values == valid_values[0]):
                     out_data[i, j] = valid_values[0]
                     continue
-                
+
                 # 计算IDW权重
                 with np.errstate(divide='ignore', invalid='ignore'):
                     weights = 1.0 / (valid_distances + 1e-8)
-                    
+
                     # 对距离为0的点（同一位置）给予最大权重
                     zero_dist_mask = valid_distances == 0
                     if np.any(zero_dist_mask):
                         weights[zero_dist_mask] = 1e6
-                
+
                 weights_sum = np.sum(weights)
-                
+
                 if weights_sum > 0:
                     idw_value = np.sum(weights * valid_values) / weights_sum
                     out_data[i, j] = idw_value
@@ -287,23 +424,90 @@ class IDWInterpolation():
                     # 如果权重和仍然为0，使用最近点的值
                     min_idx = np.argmin(valid_distances)
                     out_data[i, j] = valid_values[min_idx]
-        
+
         # 写入数据
         out_band = out_ds.GetRasterBand(1)
         out_band.WriteArray(out_data)
         out_band.SetNoDataValue(np.nan)
-        
-        # 重采样到目标尺寸
+
+        # 第一步：重采样到目标尺寸（如果需要）
         if cols != dst_cols or rows != dst_rows:
             resampled_ds = gdal.Warp("", out_ds, format="MEM", width=dst_cols, height=dst_rows,
-                                   resampleAlg=gdal.GRA_Bilinear, outputBounds=boundary_range)
+                                     resampleAlg=gdal.GRA_Bilinear, outputBounds=boundary_range)
             out_ds = None
             logger.info(f"IDW插值完成，重采样从 {cols}x{rows} 到 {dst_cols}x{dst_rows}")
-            return resampled_ds
-        
-        logger.info("IDW插值完成")
-        return out_ds
-    
+            out_ds = resampled_ds
+
+        # 第二步：应用掩膜边界处理
+        if mask_grid_path and os.path.exists(mask_grid_path):
+            logger.info(f"应用掩膜边界处理: {mask_grid_path}")
+
+            # 读取掩膜栅格数据
+            mask_data = gdal.Open(mask_grid_path, gdal.GA_ReadOnly)
+            if mask_data:
+                try:
+                    # 确保掩膜数据与插值数据具有相同的空间参考和尺寸
+                    mask_ds = gdal.Warp("", mask_data, format="MEM",
+                                        width=dst_cols, height=dst_rows,
+                                        outputBounds=boundary_range,
+                                        resampleAlg=gdal.GRA_NearestNeighbour)
+
+                    mask_array = mask_ds.GetRasterBand(1).ReadAsArray()
+                    result_array = out_ds.GetRasterBand(1).ReadAsArray()
+
+                    # 创建掩膜
+                    mask = (mask_array != grid_nodata) & ~np.isnan(result_array)
+
+                    # 应用掩膜
+                    result_array[~mask] = np.nan
+
+                    # 更新输出数据集
+                    out_band = out_ds.GetRasterBand(1)
+                    out_band.WriteArray(result_array)
+                    out_band.SetNoDataValue(np.nan)
+
+                    valid_count = np.sum(~np.isnan(result_array))
+                    total_count = result_array.size
+                    valid_ratio = valid_count / total_count * 100
+
+                    logger.info(f"掩膜应用完成 - 有效点数: {valid_count}/{total_count} ({valid_ratio:.1f}%)")
+
+                    # 清理临时数据集
+                    mask_ds = None
+                    mask_data = None
+
+                except Exception as e:
+                    logger.warning(f"掩膜处理失败: {str(e)}")
+            else:
+                logger.warning(f"无法打开掩膜文件: {mask_grid_path}")
+        else:
+            logger.info("未提供掩膜文件，跳过掩膜处理")
+
+        # 第三步：边界裁剪
+        logger.info("执行边界裁剪...")
+
+        # 使用Warp进行精确的边界裁剪
+        clipped_ds = gdal.Warp("", out_ds, format="MEM",
+                               width=dst_cols,
+                               height=dst_rows,
+                               outputBounds=boundary_range,
+                               resampleAlg=gdal.GRA_Bilinear,
+                               dstNodata=np.nan)
+
+        # 清理临时数据集
+        out_ds = None
+
+        # 验证最终结果
+        final_band = clipped_ds.GetRasterBand(1)
+        final_array = final_band.ReadAsArray()
+        final_valid_count = np.sum(~np.isnan(final_array))
+        final_total_count = final_array.size
+
+        logger.info(f"边界处理完成 - 最终有效点数: {final_valid_count}/{final_total_count}")
+        logger.info(f"IDW插值全部完成")
+
+        return clipped_ds
+
     def _fill_remaining_nans(self, grid_data: np.ndarray, station_data: np.ndarray,
                            station_lats: np.ndarray, station_lons: np.ndarray) -> np.ndarray:
         """填充剩余的NaN值"""

@@ -105,27 +105,16 @@ def drawmaps(tiffile,pngfile, rasterStyle, template, code, mapinfo):
     return pngfile
 
 
-def main(tiffile,pngfile,rasterStyle, template,code,areaname,cropname,zoningtype,element,startdate,enddate):
+def main(tiffile,pngfile,rasterStyle, template,code,areaname,crop_chinese,element_chinese,startdate,enddate):
 
-    pngnamedict={"ZZ_":"种植气候区划图",
-                 "CL_":"产量气候区划图",
-                "ZH_frost":"霜冻风险区划图",
-                "ZH_":"干旱风险区划图",       #需要添加
-                "PZ_protein":"粗蛋白气候区划图",     #需要添加
-                "PZ_fat":"脂肪气候区划图",       #需要添加
-                "BH_sclerotinia":"菌核病气候风险区划图",
-                "BH_bean_moth":"食心虫气候风险区划图"
-                }
-    cropnamedict={"soybean":"大豆","SPSO":"大豆"
-        }
-    if element in [""," ","   "]:
-        element=""
-    mapinfo = {"title": areaname+cropnamedict[cropname]+pngnamedict[str(zoningtype+"_"+element)],
+
+    mapinfo = {"title": areaname+crop_chinese+element_chinese+"区划图",
                "date": startdate[:4]+"年"+"-"+enddate[:4]+"年",
                }        
         
     drawmaps(tiffile,pngfile, rasterStyle, template, code, mapinfo)  
     return pngfile
+
 
 
 if __name__ == '__main__':

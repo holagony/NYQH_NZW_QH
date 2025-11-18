@@ -26,5 +26,51 @@
             {"min": 55, "max": 65, "level": 3, "label": "重旱"},
             {"min": 65, "max": 100, "level": 4, "label": "特旱"}]
         }
-    }
+    },
+    "LCY": {
+        "indicators": {
+            "Pre": {
+                "type": "period_sum",
+                "frequency": "yearly",
+                "start_date": "05-20",
+                "end_date": "06-10",
+                "variable": "precip",
+                "description": "5月20日-6月10日总降水量"
+            },
+            "SSH": {
+                "type": "period_sum",
+                "frequency": "yearly",
+                "start_date": "05-20",
+                "end_date": "06-10",
+                "variable": "sunshine",
+                "description": "5月20日-6月10日总日照时数"
+            },
+            "Pre_days": {
+                "type": "conditional_count",
+                "frequency": "yearly",
+                "start_date": "05-20",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": ">=",
+                        "value": 0.1
+                    }
+                ],
+                "description": "5月20日-6月10日降水日数"
+            }
+        },
+        "interpolation": {
+            "method": "idw"
+        },
+        "classification": {
+            "method": "custom_thresholds",
+            "thresholds": [
+                {"min": 0.1, "level": 1, "label": "高风险"},
+                {"min": 0.07, "max": 0.1, "level": 2, "label": "中风险"},
+                {"min": 0.05, "max": 0.07, "level": 3, "label": "中风险"},
+                {"max":0.05, "level": 4, "label": "低风险"}  
+            ]
+        }
+    }   
 }

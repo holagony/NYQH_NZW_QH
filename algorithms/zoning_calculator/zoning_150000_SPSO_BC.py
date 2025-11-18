@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, Any
 import importlib
 
-class SPSO_PestZoning:
+class SPSO_BC:
     """内蒙古大豆病虫害区划计算器"""
     
     def __init__(self):
@@ -18,9 +18,9 @@ class SPSO_PestZoning:
         # 根据病虫害类型选择计算方式
         pest_type = config['element']
         
-        if pest_type == 'sclerotinia':
+        if pest_type == 'JHB':
             return self._calculate_sclerotinia(params)
-        elif pest_type == 'bean_moth':
+        elif pest_type == 'SXC':
             return self._calculate_bean_moth(params)
         else:
             raise ValueError(f"不支持的病虫害类型: {pest_type}")

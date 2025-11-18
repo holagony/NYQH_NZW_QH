@@ -1,0 +1,95 @@
+{
+    "QHSYX":
+    {
+        "interpolation": {
+            "method": "lsm_idw",
+            "order":"after",
+            "params": {
+                "radius_dist": 5.0,
+                "min_num": 10,
+                "first_size": 100,
+                "var_name": "suitability"
+            }
+        },
+        "indicators": {
+            "GDD": {
+                "type": "growing_degree_days",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "09-30",
+                "base_temp": 10,
+                "method": "mean",
+                "description": "生育期活动积温"
+            },
+            "Precip_Total": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "09-30", 
+                "variable": "precip",
+                "description": "生育期总降水"
+            },
+            "Frost_Free_Days": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "09-30",
+                "conditions": [
+                    {
+                        "variable": "tmin",
+                        "operator": ">=",
+                        "value": 0
+                    }
+                ],
+                "description": "无霜期天数"
+            },
+            "Sunshine_Hours": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "09-30",
+                "variable": "sunshine",
+                "description": "生育期总日照时数"
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "w1 * GDD_norm + w2 * Precip_norm + w3 * Frost_norm + w4 * Sunshine_norm",
+            "weight": {
+                "w1": 0.35,
+                "w2": 0.25,
+                "w3": 0.20,
+                "w4": 0.20
+            },
+            "variables": {
+                "GDD_norm": {
+                    "type": "standardize",
+                    "value": {"ref": "GDD"}
+                },
+                "Precip_norm": {
+                    "type": "standardize", 
+                    "value": {"ref": "Precip_Total"}
+                },
+                "Frost_norm": {
+                    "type": "standardize",
+                    "value": {"ref": "Frost_Free_Days"}
+                },
+                "Sunshine_norm": {
+                    "type": "standardize",
+                    "value": {"ref": "Sunshine_Hours"}
+                }
+            },
+            "description": "种植适宜性综合指数"
+        },
+        "classification": {
+            "method": "natural_breaks",
+            "num_classes":4,
+            "thresholds": [
+                {"level": 4, "label": "不适宜区","min":"", "max": 0.6},
+                {"level": 3, "label": "次适宜区", "min": 0.6, "max": 0.65},
+                {"level": 2, "label": "适宜区", "min": 0.65, "max": 0.7},
+                {"level": 1, "label": "最适宜区", "min": 0.7,"max":""}
+            ]
+        }
+    }
+}

@@ -19,7 +19,7 @@ from arspy.id import product, period, fmt
 import warnings
 warnings.filterwarnings('ignore')
 
-from algorithms.zoning_processor import ZoningProcessor
+from algorithms.zoning_processor_sheng import ZoningProcessor
 
 def main(json_data):
     """
@@ -29,10 +29,9 @@ def main(json_data):
     fjson = glo.get_value("fjson")
     
     try:
-        fjson.info("气候区划算法开始执行")
         # 创建处理器
         processor = ZoningProcessor(json_data, fjson, rjson)
-        fjson.info("参数获取完成")
+        
         # 执行处理
         success = processor.process()
         
@@ -52,7 +51,7 @@ if __name__ == "__main__":
         json_path = sys.argv[1]
     else:
         # 默认配置文件路径
-        json_path = "inputJson_nmg_win_hlj.json"
+        json_path = "inputJson_WIWH_PZ.json"
     
     # 读取json文件
     obj = JsonTool()

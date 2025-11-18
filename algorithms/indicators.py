@@ -4,6 +4,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import re
 
+# 添加最小值
+
 class IndicatorCalculator:
     """指标计算器，用于从基础气象数据中计算各种指标 - 增强版支持多种频率"""
     
@@ -33,6 +35,8 @@ class IndicatorCalculator:
         """根据配置计算指标 - 支持频率参数"""
         indicator_type = indicator_config.get("type")
         frequency = indicator_config.get("frequency", "lta")  # 默认为多年平均
+        print(frequency)
+        breakpoint()
         
         if indicator_type not in self._functions:
             raise ValueError(f"不支持的指标类型: {indicator_type}")
@@ -54,7 +58,8 @@ class IndicatorCalculator:
             "bean_moth_X1": self._calculate_bean_moth_X1,
             "bean_moth_X2": self._calculate_bean_moth_X2,
             "bean_moth_X3": self._calculate_bean_moth_X3,
-            "bean_moth_X4": self._calculate_bean_moth_X4
+            "bean_moth_X4": self._calculate_bean_moth_X4,
+            "total_radiation": self._calculate_total_radiation
         }
         
     def _calculate_daily_value(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
@@ -214,13 +219,16 @@ class IndicatorCalculator:
             # 返回多年平均
             return float(yearly_sums.mean()) if not yearly_sums.empty else np.nan
     
-    def _calculate_period_extreme(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
+    def _calculate_period_extreme(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "yearly") -> Union[float, Dict[int, float]]:
         """优化的时间段极值计算 - 支持多种频率输出"""
         start_date_str = config["start_date"]
         end_date_str = config["end_date"]
         variable = config["variable"]
         extreme_type = config.get("extreme_type", "max")
         year_offset = config.get("year_offset", 0)
+
+        print('===============')
+        print(frequency)
         
         if data.empty:
             return np.nan if frequency == "lta" else {}
@@ -264,6 +272,9 @@ class IndicatorCalculator:
             yearly_extremes = period_data.groupby(period_data.index.year).max()
         else:
             yearly_extremes = period_data.groupby(period_data.index.year).min()
+
+
+        print(yearly_extremes.to_dict())
         
         if frequency == "yearly":
             # 返回逐年数据
@@ -343,12 +354,15 @@ class IndicatorCalculator:
         else:
             return np.nan if frequency == "lta" else {}
     
-    def _calculate_conditional_count(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
+    def _calculate_conditional_count(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "yearly") -> Union[float, Dict[int, float]]:
         """优化的条件计数计算 - 支持多种频率输出"""
         start_date_str = config["start_date"]
         end_date_str = config["end_date"]
         conditions = config["conditions"]
         year_offset = config.get("year_offset", 0)
+
+        print('===============')
+        print(frequency)
         
         if data.empty:
             return np.nan if frequency == "lta" else {}
@@ -474,7 +488,142 @@ class IndicatorCalculator:
         else:
             # 返回多年平均
             return yearly_gdd.mean() if not yearly_gdd.empty else 0
-    
+
+    def _calculate_total_radiation(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> \
+    Union[float, Dict[int, float]]:
+        """优化的活动积温计算 - 支持多种频率输出"""
+        start_date_str = config["start_date"]
+        end_date_str = config["end_date"]
+        year_offset = config.get("year_offset", 0)
+
+        if data.empty:
+            return np.nan if frequency == "lta" else {}
+
+        # 创建年份掩码
+        def create_year_mask(data_index, start_date_str, end_date_str, year_offset):
+            years = data_index.year.unique()
+            all_masks = []
+            year_info = []
+
+            for year in years:
+                start_date = pd.to_datetime(f"{year}-{start_date_str}")
+                end_year = year + year_offset
+                end_date = pd.to_datetime(f"{end_year}-{end_date_str}")
+
+                year_mask = (data_index >= start_date) & (data_index <= end_date)
+                all_masks.append(year_mask)
+                year_info.append(year)
+
+            if all_masks:
+                combined_mask = all_masks[0]
+                for mask in all_masks[1:]:
+                    combined_mask = combined_mask | mask
+                return combined_mask, year_info
+            else:
+                return pd.Series(False, index=data_index), []
+
+        def sunset_hour_angle(latitude, solar_declination):
+            """
+            计算日落时角（弧度）
+
+            参数:
+            - latitude: 纬度（度数）
+            - solar_declination: 太阳赤纬（弧度）
+
+            返回:
+            - 日落时角（弧度）
+            """
+            lat_rad = np.radians(latitude)
+
+            # 日落时角公式: cos(ωs) = -tan(φ) * tan(δ)
+            cos_omega = -np.tan(lat_rad) * np.tan(solar_declination)
+
+            # 限制在有效范围内 [-1, 1]
+            cos_omega = np.clip(cos_omega, -1.0, 1.0)
+
+            # 计算日落时角
+            omega_s = np.arccos(cos_omega)
+
+            return omega_s
+
+        def solar_declination(day_of_year):
+            """
+            计算太阳赤纬
+
+            参数:
+            - day_of_year: 年内的日序数（1-365/366）
+
+            返回:
+            - 太阳赤纬（弧度）
+            """
+            return 0.409 * np.sin((2*np.pi/365)*day_of_year-1.39)
+
+        def d_m_2(day_of_year):
+            '''地球轨道偏心率订正系数'''
+            return 1+0.033*np.cos((2*np.pi/365)*day_of_year)
+
+        def calculate_solar_radiation(latitude, day_of_year):
+            """
+            计算总辐射Ra (MJ/m²/day)
+
+            公式: Ra = I_0 × d_m_2 × T/π × (ω_s × sin(纬度) × sin(太阳赤纬) + cos(纬度) × cos(太阳赤纬) × sin(ω_s))
+            """
+            # 常数
+            I_0 = 0.0820  # 太阳常数 (MJ/m²/min)
+            T = 1440  # 每天的分钟数
+
+            # 计算中间变量
+            delta = solar_declination(day_of_year)  # 太阳赤纬
+            d_m2 = d_m_2(day_of_year)  # 地球轨道偏心率订正系数
+            omega_s = sunset_hour_angle(latitude, delta)  # 日落时角
+
+            lat_rad = np.radians(latitude)  # 纬度转换为弧度
+
+            # 计算总辐射
+            term1 = omega_s * np.sin(lat_rad) * np.sin(delta)
+            term2 = np.cos(lat_rad) * np.cos(delta) * np.sin(omega_s)
+
+            Ra = I_0 * d_m2 * (T / np.pi) * (term1 + term2)
+
+            return Ra
+
+        period_mask, years = create_year_mask(data.index, start_date_str, end_date_str, year_offset)
+
+        if not period_mask.any():
+            return np.nan if frequency == "lta" else {}
+
+        # 使用掩码获取时间段数据
+        period_data = data.loc[period_mask]
+
+        if period_data.empty:
+            return np.nan if frequency == "lta" else {}
+
+        # 计算总辐射公式
+        period_data['day_of_year'] = period_data.index.dayofyear  # pandas内置的日序数计算
+        # 假设数据中包含纬度信息，这里需要根据实际情况获取纬度
+        # 如果数据中有纬度列，使用数据中的纬度；否则使用固定纬度
+        if 'lat' in period_data.columns:
+            # 使用每个站点的实际纬度
+            period_data['solar_radiation'] = period_data.apply(
+                lambda row: calculate_solar_radiation(row['lat'], row['day_of_year']), axis=1
+            )
+        else:
+            # 使用固定纬度（需要你提供实际纬度值）
+            fixed_latitude = 40.0  # 示例纬度，请替换为实际值
+            period_data['solar_radiation'] = period_data['day_of_year'].apply(
+                lambda doy: calculate_solar_radiation(fixed_latitude, doy)
+            )
+
+        # 按年份分组计算每年总辐射
+        yearly_solar_radiation = period_data.groupby(period_data.index.year)['solar_radiation'].sum()
+
+        if frequency == "yearly":
+            # 返回逐年数据
+            return yearly_solar_radiation.to_dict()
+        else:
+            # 返回多年平均
+            return yearly_solar_radiation.mean() if not yearly_solar_radiation.empty else 0
+
     def _calculate_custom_formula(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Any:
         """使用自定义公式计算指标 - 支持多种频率输出"""
         formula = config["formula"]

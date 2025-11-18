@@ -16,7 +16,7 @@ import traceback
 from arspy.api import ResultJson, FlowJson
 from arspy import glo
 from config import algName, keySteps, labels
-from main import main
+from main_sheng import main
 
 def app(jsonpath):
     starttime = time.time()
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 1:
             jsonPath = sys.argv[1]
     except:
-        jsonPath="/mnt/PRESKY/user/wuyujie/yanfa/NYQH/NYQH_NZW_QH/inputJson_SPSO_ZH_SD.json"
+        jsonPath="/mnt/PRESKY/user/wuyujie/yanfa/NYQH/NYQH_NZW_QH/inputJson_WIWH_BC.json"
 
     # 调用
     sys.exit(app(jsonPath))

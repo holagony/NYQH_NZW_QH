@@ -1,208 +1,13 @@
-
+from pathlib import Path
 import numpy as np
 from typing import Dict, Any
-from algorithms.interpolation import InterpolateTool
-from algorithms.classification import ClassificationTool
-from algorithms.indicators import IndicatorTool
 
-class GenericZoningCalculator:
-    """通用区划计算器 - 支持完全参数化配置"""
-    
-    @staticmethod
-    def calculate(params: Dict[str, Any]) -> Dict[str, Any]:
-        """执行通用区划计算"""
-        # 获取算法配置
-        algorithm_config = params.get('algorithmConfig', {})
-        
-        # 获取输入数据
-        station_indicators = params['station_indicators']
-        station_coords = params['station_coords']
-        grid_path = params['grid_path']
-        dem_path = params.get('dem_path')
-        
-        # 获取插值配置
-        interpolation_config = algorithm_config.get('interpolation', {})
-        interpolation_method = interpolation_config.get('method', 'idw')
-        interpolation_params = interpolation_config.get('params', {})
-        
-        # 获取公式配置
-        formula_config = algorithm_config.get('formula', {})
-        
-        # 获取分类配置
-        classification_config = algorithm_config.get('classification', {})
-        classification_method = classification_config.get('method', 'equal_interval')
-        classification_params = classification_config.get('params', {})
-        
-        # 计算综合指标
-        composite_indicators = GenericZoningCalculator._calculate_composite_indicators(
-            station_indicators, formula_config
-        )
-        
-        # 插值
-        interpolation_data = {
-            'station_values': composite_indicators,
-            'station_coords': station_coords,
-            'grid_path': grid_path,
-            'dem_path': dem_path
-        }
-        
-        # 选择插值方法
-        if interpolation_method == 'idw':
-            interpolated = InterpolateTool.idw_interpolation(interpolation_data, interpolation_params)
-        elif interpolation_method == 'lsm_idw':
-            interpolated = InterpolateTool.lsm_idw_interpolation(interpolation_data, interpolation_params)
-        elif interpolation_method == 'kriging':
-            interpolated = InterpolateTool.kriging_interpolation(interpolation_data, interpolation_params)
-        else:
-            interpolated = InterpolateTool.idw_interpolation(interpolation_data, interpolation_params)
-        
-        # 分级
-        classified_data = GenericZoningCalculator._classify_data(
-            interpolated['data'], classification_method, classification_params
-        )
-        
-        return {
-            'data': classified_data,
-            'meta': interpolated['meta'],
-            'type': formula_config.get('description', 'composite_index'),
-            'classification_method': classification_method,
-            'formula_used': formula_config.get('expression', '')
-        }
-    
-    @staticmethod
-    def _calculate_composite_indicators(station_indicators: Dict[str, Any], 
-                                      formula_config: Dict[str, Any]) -> Dict[str, float]:
-        """计算综合指标"""
-        formula_type = formula_config.get('type', 'linear_combination')
-        
-        if formula_type == 'linear_combination':
-            return GenericZoningCalculator._linear_combination(station_indicators, formula_config)
-        elif formula_type == 'custom_formula':
-            return GenericZoningCalculator._custom_formula(station_indicators, formula_config)
-        else:
-            raise ValueError(f"不支持的公式类型: {formula_type}")
-    
-    @staticmethod
-    def _linear_combination(station_indicators: Dict[str, Any], 
-                          formula_config: Dict[str, Any]) -> Dict[str, float]:
-        """线性组合公式"""
-        expression = formula_config['expression']
-        coefficients = formula_config['coefficients']
-        variables_config = formula_config['variables']
-        
-        composite_indicators = {}
-        
-        for station_id, indicators in station_indicators.items():
-            # 准备变量字典
-            var_dict = coefficients.copy()  # 先加入系数
-            
-            for var_name, var_config in variables_config.items():
-                if 'ref' in var_config:
-                    ref_name = var_config['ref']
-                    if ref_name in indicators:
-                        var_dict[var_name] = indicators[ref_name]
-                    else:
-                        var_dict[var_name] = np.nan
-                else:
-                    var_dict[var_name] = var_config.get('value', 0)
-            
-            # 计算表达式
-            try:
-                # 安全地计算表达式
-                composite_value = GenericZoningCalculator._safe_eval(expression, var_dict)
-                composite_indicators[station_id] = composite_value
-            except Exception as e:
-                print(f"站点 {station_id} 公式计算失败: {str(e)}")
-                composite_indicators[station_id] = np.nan
-        
-        return composite_indicators
-    
-    @staticmethod
-    def _custom_formula(station_indicators: Dict[str, Any], 
-                       formula_config: Dict[str, Any]) -> Dict[str, float]:
-        """自定义公式"""
-        formula = formula_config['expression']
-        variables_config = formula_config.get('variables', {})
-        
-        composite_indicators = {}
-        
-        for station_id, indicators in station_indicators.items():
-            # 准备变量字典
-            var_dict = {}
-            for var_name, var_config in variables_config.items():
-                if 'ref' in var_config:
-                    ref_name = var_config['ref']
-                    if ref_name in indicators:
-                        var_dict[var_name] = indicators[ref_name]
-                    else:
-                        var_dict[var_name] = np.nan
-                else:
-                    var_dict[var_name] = var_config.get('value', 0)
-            
-            # 替换公式中的变量
-            custom_formula = formula
-            for var_name, var_value in var_dict.items():
-                custom_formula = custom_formula.replace(var_name, str(var_value))
-            
-            # 计算表达式
-            try:
-                composite_value = eval(custom_formula)
-                composite_indicators[station_id] = composite_value
-            except Exception as e:
-                print(f"站点 {station_id} 自定义公式计算失败: {str(e)}")
-                composite_indicators[station_id] = np.nan
-        
-        return composite_indicators
-    
-    @staticmethod
-    def _safe_eval(expression: str, variables: Dict[str, float]) -> float:
-        """安全地计算数学表达式"""
-        # 限制可用的函数和操作
-        allowed_names = {
-            'abs': abs, 'min': min, 'max': max, 'round': round,
-            'sum': sum, 'pow': pow, 'sqrt': np.sqrt, 'log': np.log,
-            'exp': np.exp, 'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
-            'pi': np.pi, 'e': np.e
-        }
-        
-        # 添加变量
-        allowed_names.update(variables)
-        
-        # 编译表达式
-        code = compile(expression, '<string>', 'eval')
-        
-        # 验证名称
-        for name in code.co_names:
-            if name not in allowed_names:
-                raise NameError(f"Use of {name} not allowed")
-        
-        return eval(code, {'__builtins__': {}}, allowed_names)
-    
-    @staticmethod
-    def _classify_data(data: np.ndarray, method: str, params: Dict[str, Any]) -> np.ndarray:
-        """数据分级"""
-        if method == 'equal_interval':
-            return ClassificationTool.equal_interval(data, params)
-        elif method == 'natural_breaks':
-            return ClassificationTool.natural_breaks(data, params)
-        elif method == 'custom_thresholds':
-            return ClassificationTool.custom_thresholds(data, params)
-        else:
-            return ClassificationTool.equal_interval(data, params)
+
+# from algorithms.interpolation import InterpolateTool
+# from algorithms.classification import ClassificationTool
 
 class WIWH_PZ:
-    """
-    通用计算器
-    ===
-    【适用于指标为】
-    抽穗期至成熟期内最高气温（Tmax，℃）
-    降水日数（Pred，d，日降水量≥0.1mm）
-    最低气温（Tmin，℃）
-    ≥10℃活动积温（AT10，℃·d）
-    ===
-    【方程示例】
-    y=15.537+1.652*Tmax-1.179*Tmean-0.316*Pred-0.115*RH-0.286*N32
-    """
+    """计算河南小麦品质气候区划计算器"""
     def __init__(self):
         pass
 
@@ -361,6 +166,7 @@ class WIWH_PZ:
         station_composite_values = {}
         valid_station_count = 0
 
+        # print(station_indicators)
         for station_id, station_values in station_indicators.items():
             try:
                 # 存储某个站的多个指标，与calculate_grid接口保持一致
@@ -374,19 +180,21 @@ class WIWH_PZ:
                         # 处理直接数值格式
                         station_indicators_dict[indicator_name] = station_values
 
-                # 在站点级别计算综合指标
-                composite_value = self.calculate_grid(station_indicators_dict, crop_config)
-
-                if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
-                    station_composite_values[station_id] = composite_value['data'][0]
-                    valid_station_count += 1
-                else:
-                    station_composite_values[station_id] = np.nan
-                    print(f"站点 {station_id} 计算失败，结果为NaN")
-
             except Exception as e:
                 print(f"站点 {station_id} 计算异常: {str(e)}")
                 station_composite_values[station_id] = np.nan
+        # print(station_composite_values)
+        # breakpoint()
+
+        # 在站点级别计算综合指标
+        composite_value = self.calculate_grid(station_indicators_dict, crop_config)
+
+        if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
+            station_composite_values[station_id] = composite_value['data'][0]
+            valid_station_count += 1
+        else:
+            station_composite_values[station_id] = np.nan
+            print(f"站点 {station_id} 计算失败，结果为NaN")
 
         print(f"成功计算综合指标的站点数: {valid_station_count}/{len(station_indicators)}")
 
@@ -416,7 +224,7 @@ class WIWH_PZ:
             print(f"综合指标插值失败: {str(e)}")
             raise
 
-    def calculate_grid(self, interpolated_indicators: Dict[str, Any],
+    def calculate_grid(self, indicators: Dict[str, Any],
                        crop_config: Dict[str, Any]) -> Any:
         """栅格级别的区划计算 - 支持站点级别和栅格级别计算"""
         print("执行区划计算")
@@ -429,8 +237,8 @@ class WIWH_PZ:
         # 处理简单引用配置
         if "ref" in formula_config:
             ref_name = formula_config["ref"]
-            if ref_name in interpolated_indicators:
-                result = interpolated_indicators[ref_name]
+            if ref_name in indicators:
+                result = indicators[ref_name]
                 print(f"直接返回指标 {ref_name} 的结果")
                 return result
             else:
@@ -449,36 +257,19 @@ class WIWH_PZ:
             raise ValueError("不支持的公式类型或公式为空")
 
         # 检测计算级别：站点级别还是栅格级别
-        calculation_level = self._detect_calculation_level(interpolated_indicators)
+        calculation_level = self._detect_calculation_level(indicators)
         print(f"检测到计算级别: {calculation_level}")
 
         if calculation_level == "station":
             # 站点级别计算
-            return self._calculate_station_level(interpolated_indicators, formula_str, variables_config, crop_config)
+            return self._calculate_station_level(indicators, formula_str, variables_config, crop_config)
         else:
             # 栅格级别计算
-            return self._calculate_grid_level(interpolated_indicators, formula_str, variables_config, crop_config)
+            return self._calculate_grid_level(indicators, formula_str, variables_config, crop_config)
 
-    def _standardize_grid(self, grid_data: np.ndarray) -> np.ndarray:
-        """对栅格数据进行标准化"""
-        valid_mask = ~np.isnan(grid_data)
-        if not np.any(valid_mask):
-            return np.full_like(grid_data, np.nan)
-
-        valid_values = grid_data[valid_mask]
-        min_val = np.min(valid_values)
-        max_val = np.max(valid_values)
-
-        if max_val == min_val:
-            return np.full_like(grid_data, 0.5)
-
-        standardized = np.full_like(grid_data, np.nan)
-        standardized[valid_mask] = (valid_values - min_val) / (max_val - min_val)
-        return standardized
-
-    def _detect_calculation_level(self, interpolated_indicators: Dict[str, Any]) -> str:
+    def _detect_calculation_level(self, indicators: Dict[str, Any]) -> str:
         """检测计算级别"""
-        for indicator_name, indicator_data in interpolated_indicators.items():
+        for indicator_name, indicator_data in indicators.items():
             if isinstance(indicator_data, dict) and 'data' in indicator_data:
                 data_content = indicator_data['data']
                 if isinstance(data_content, np.ndarray):
@@ -493,7 +284,7 @@ class WIWH_PZ:
         # 默认使用栅格级别
         return "grid"
 
-    def _calculate_station_level(self, interpolated_indicators: Dict[str, Any],
+    def _calculate_station_level(self, indicators: Dict[str, Any],
                                  formula_str: str, variables_config: Dict[str, Any],
                                  crop_config: Dict[str, Any]) -> Any:
         """站点级别计算"""
@@ -506,8 +297,8 @@ class WIWH_PZ:
         for var_name, var_config in variables_config.items():
             if "ref" in var_config:
                 ref_name = var_config["ref"]
-                if ref_name in interpolated_indicators:
-                    indicator_data = interpolated_indicators[ref_name]
+                if ref_name in indicators:
+                    indicator_data = indicators[ref_name]
 
                     # 提取数据值
                     if isinstance(indicator_data, (int, float)):
@@ -638,6 +429,23 @@ class WIWH_PZ:
             # 创建一个与输入栅格相同大小的常量栅格
             first_grid = next(iter(interpolated_indicators.values()))['data']
             return np.full_like(first_grid, value)
+
+    def _standardize_grid(self, grid_data: np.ndarray) -> np.ndarray:
+        """对栅格数据进行标准化"""
+        valid_mask = ~np.isnan(grid_data)
+        if not np.any(valid_mask):
+            return np.full_like(grid_data, np.nan)
+
+        valid_values = grid_data[valid_mask]
+        min_val = np.min(valid_values)
+        max_val = np.max(valid_values)
+
+        if max_val == min_val:
+            return np.full_like(grid_data, 0.5)
+
+        standardized = np.full_like(grid_data, np.nan)
+        standardized[valid_mask] = (valid_values - min_val) / (max_val - min_val)
+        return standardized
 
     def _evaluate_formula(self, formula_str: str, variables_data: Dict[str, np.ndarray]) -> np.ndarray:
         """评估公式"""
@@ -813,3 +621,10 @@ class WIWH_PZ:
         # 默认使用Float32
         print(f"警告: 无法映射numpy数据类型 {numpy_dtype}，默认使用GDT_Float32")
         return gdal.GDT_Float32
+
+
+
+
+
+
+

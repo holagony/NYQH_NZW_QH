@@ -2,10 +2,10 @@ from typing import Dict, Any
 import numpy as np
 
 class NaturalBreaksClassification():
-    """自然断点分级算法（Jenks自然断点法）"""
+    """自然断点分级算法（Jenks自然断点法）- 反转等级"""
     
     def execute(self, data: Any, params: Dict[str, Any] = None) -> Any:
-        """执行自然断点分级"""
+        """执行自然断点分级（等级反转）"""
         if isinstance(data, dict):
             # 处理站点数据字典
             return self._classify_station_data(data, params)
@@ -14,7 +14,7 @@ class NaturalBreaksClassification():
             return self._classify_array_data(data, params)
     
     def _classify_station_data(self, station_data: Dict[str, float], params: Dict[str, Any] = None) -> Dict[str, int]:
-        """对站点数据进行自然断点分级"""
+        """对站点数据进行自然断点分级（等级反转）"""
         if not station_data:
             return {}
         
@@ -30,7 +30,7 @@ class NaturalBreaksClassification():
         # 计算自然断点
         breaks = self._jenks_breaks(values, num_classes)
         
-        # 对每个站点值进行分类
+        # 对每个站点值进行分类（等级反转）
         result = {}
         for station_id, value in station_data.items():
             if np.isnan(value):
@@ -39,15 +39,16 @@ class NaturalBreaksClassification():
                 # 查找值所在的区间
                 for i in range(1, len(breaks)):
                     if value <= breaks[i]:
-                        result[station_id] = i
+                        # 等级反转：原本的等级i变成 (num_classes - i + 1)
+                        result[station_id] = num_classes - i + 1
                         break
                 else:
-                    result[station_id] = len(breaks) - 1
+                    result[station_id] = 1  # 最高值对应最低等级（反转后）
         
         return result
     
     def _classify_array_data(self, data: np.ndarray, params: Dict[str, Any] = None) -> np.ndarray:
-        """对数组数据进行自然断点分级"""
+        """对数组数据进行自然断点分级（等级反转）"""
         if data.size == 0:
             return data
         
@@ -66,23 +67,23 @@ class NaturalBreaksClassification():
         # 创建结果数组 - 使用int32类型
         result = np.zeros_like(data, dtype=np.int32)
         
-        # 对每个值进行分类
+        # 对每个值进行分类（等级反转）
         for i in range(1, len(breaks)):
+            # 计算反转后的等级
+            reversed_class = num_classes - i + 1
+            
             if i < len(breaks) - 1:
                 mask = (data > breaks[i-1]) & (data <= breaks[i]) & ~np.isnan(data)
             else:
                 mask = (data > breaks[i-1]) & ~np.isnan(data)
             
-            result[mask] = i
+            result[mask] = reversed_class
         
         return result
 
     
     def _jenks_breaks(self, data: np.ndarray, num_classes: int) -> list:
         """计算Jenks自然断点"""
-        # 简化实现，实际应该使用更复杂的Jenks算法
-        # 这里使用分位数作为近似
-        
         # 对数据进行排序
         sorted_data = np.sort(data)
         
@@ -103,5 +104,14 @@ class NaturalBreaksClassification():
         for break_val in breaks:
             if break_val not in unique_breaks:
                 unique_breaks.append(break_val)
+        
+        # 如果断点数量不足，补充断点
+        while len(unique_breaks) < num_classes + 1:
+            if len(unique_breaks) == 0:
+                unique_breaks.append(np.min(data))
+            unique_breaks.append(np.max(data))
+            # 去重
+            unique_breaks = list(set(unique_breaks))
+            unique_breaks.sort()
         
         return unique_breaks

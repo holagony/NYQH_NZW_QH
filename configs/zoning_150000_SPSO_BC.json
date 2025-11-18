@@ -1,5 +1,5 @@
 {
-    "sclerotinia": {
+    "JHB": {
         "indicators": {
             "D": {
                 "type": "conditional_count",
@@ -41,7 +41,7 @@
             ]
         }
     },
-    "bean_moth": {
+    "SXC": {
         "indicators": {
             "T1": {
                 "type": "period_mean",
