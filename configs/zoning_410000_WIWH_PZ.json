@@ -33,18 +33,16 @@
         },
         "formula": {
             "type": "custom_formula",
-            "formula": "0.4* X1 - 0.4 * X2 - 0.2 * X3",
+            "standardize": "True",
+            "formula": "0.4 * X1 - 0.4 * X2 - 0.2 * X3",
             "variables": {
                 "X1": {
-                    "type": "standardize",
                     "ref": "Tmax"
                 },
                 "X2": {
-                    "type": "standardize",
                     "ref": "Tmin"
                 },
                 "X3": {
-                    "type": "standardize",
                     "ref": "Pred"
                 }
             }
@@ -68,21 +66,21 @@
             "Tmax": {
                 "type": "period_extreme",
                 "extreme_type": "max",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "variable": "tmax"
             },
             "Tmean": {
                 "type": "period_mean",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "variable": "tavg"
             },
             "Tmaxd": {
                 "type": "conditional_count",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "conditions": [
@@ -95,7 +93,7 @@
             },
             "Pred": {
                 "type": "conditional_count",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "conditions": [
@@ -109,6 +107,7 @@
         },
         "formula": {
             "type": "custom_formula",
+            "standardize": "True",
             "formula": "0.5 * X1 - 0.3 * X2 - 0.1 * X3 - 0.1 * X4",
             "variables": {
                 "X1": {
@@ -143,7 +142,7 @@
         "indicators": {
             "AT10": {
                 "type": "growing_degree_days",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "variable": "tavg"
@@ -151,6 +150,7 @@
         },
         "formula": {
             "type": "custom_formula",
+            "standardize": "True",
             "formula": "1 * X1",
             "variables": {
                 "X1": {
@@ -176,14 +176,14 @@
         "indicators": {
             "Tmin": {
                 "type": "period_extreme",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "variable": "tmin"
             },
             "Pred": {
                 "type": "conditional_count",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "conditions": [
@@ -196,7 +196,7 @@
             },
             "N20-22": {
                 "type": "conditional_count",
-                "frequency": "lta",
+                "frequency": "yearly",
                 "start_date": "04-21",
                 "end_date": "05-31",
                 "conditions": [
@@ -210,10 +210,10 @@
          },
         "formula": {
             "type": "custom_formula",
+            "standardize": "False",
             "formula": "-0.4 * X1 + 0.2 * X2 - 0.4 * X3",
             "variables": {
                 "X1": {
-                    "type": "standardize",
                     "ref": "Tmin"
                 },
                 "X2": {

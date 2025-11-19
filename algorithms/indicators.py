@@ -35,9 +35,7 @@ class IndicatorCalculator:
         """根据配置计算指标 - 支持频率参数"""
         indicator_type = indicator_config.get("type")
         frequency = indicator_config.get("frequency", "lta")  # 默认为多年平均
-        print(frequency)
-        breakpoint()
-        
+
         if indicator_type not in self._functions:
             raise ValueError(f"不支持的指标类型: {indicator_type}")
         
@@ -55,10 +53,6 @@ class IndicatorCalculator:
             "growing_degree_days": self._calculate_growing_degree_days,
             "custom_formula": self._calculate_custom_formula,
             "standardize": self._calculate_standardize,
-            "bean_moth_X1": self._calculate_bean_moth_X1,
-            "bean_moth_X2": self._calculate_bean_moth_X2,
-            "bean_moth_X3": self._calculate_bean_moth_X3,
-            "bean_moth_X4": self._calculate_bean_moth_X4,
             "total_radiation": self._calculate_total_radiation
         }
         
@@ -227,9 +221,6 @@ class IndicatorCalculator:
         extreme_type = config.get("extreme_type", "max")
         year_offset = config.get("year_offset", 0)
 
-        print('===============')
-        print(frequency)
-        
         if data.empty:
             return np.nan if frequency == "lta" else {}
         
@@ -273,9 +264,6 @@ class IndicatorCalculator:
         else:
             yearly_extremes = period_data.groupby(period_data.index.year).min()
 
-
-        print(yearly_extremes.to_dict())
-        
         if frequency == "yearly":
             # 返回逐年数据
             return yearly_extremes.to_dict()
@@ -361,9 +349,6 @@ class IndicatorCalculator:
         conditions = config["conditions"]
         year_offset = config.get("year_offset", 0)
 
-        print('===============')
-        print(frequency)
-        
         if data.empty:
             return np.nan if frequency == "lta" else {}
         
@@ -691,125 +676,6 @@ class IndicatorCalculator:
         
         return " & ".join(expr_parts) if expr_parts else ""
     
-    # 大豆食心虫相关函数也需要支持频率参数
-    def _calculate_bean_moth_X1(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
-        """根据大豆食心虫赋值表计算X1 - 支持多种频率输出"""
-        value = config["value"]
-        if isinstance(value, dict) and "ref" in value:
-            # 传递频率参数
-            value_with_freq = value.copy()
-            value_with_freq["frequency"] = frequency
-            T1 = self.calculate(data, value_with_freq)
-            
-            # 根据赋值表计算X1
-            if frequency == "yearly" and isinstance(T1, dict):
-                # 处理逐年数据
-                yearly_X1 = {}
-                for year, t1_value in T1.items():
-                    if np.isnan(t1_value):
-                        yearly_X1[year] = np.nan
-                    elif t1_value < 15:
-                        yearly_X1[year] = 1
-                    elif 15 <= t1_value < 18:
-                        yearly_X1[year] = 2
-                    else:
-                        yearly_X1[year] = 3
-                return yearly_X1
-            else:
-                # 处理标量数据
-                if np.isnan(T1):
-                    return np.nan
-                elif T1 < 15:
-                    return 1
-                elif 15 <= T1 < 18:
-                    return 2
-                else:
-                    return 3
-        else:
-            return value
-    
-    def _calculate_bean_moth_X2(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
-        """根据大豆食心虫赋值表计算X2 - 支持多种频率输出"""
-        value = config["value"]
-        if isinstance(value, dict) and "ref" in value:
-            # 传递频率参数
-            value_with_freq = value.copy()
-            value_with_freq["frequency"] = frequency
-            R1 = self.calculate(data, value_with_freq)
-            
-            # 根据赋值表计算X2
-            if frequency == "yearly" and isinstance(R1, dict):
-                # 处理逐年数据
-                yearly_X2 = {}
-                for year, r1_value in R1.items():
-                    if np.isnan(r1_value):
-                        yearly_X2[year] = np.nan
-                    elif r1_value < 10:
-                        yearly_X2[year] = 1
-                    elif 10 <= r1_value < 20:
-                        yearly_X2[year] = 2
-                    else:
-                        yearly_X2[year] = 3
-                return yearly_X2
-            else:
-                # 处理标量数据
-                if np.isnan(R1):
-                    return np.nan
-                elif R1 < 10:
-                    return 1
-                elif 10 <= R1 < 20:
-                    return 2
-                else:
-                    return 3
-        else:
-            return value
-    
-    def _calculate_bean_moth_X3(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
-        """根据大豆食心虫赋值表计算X3 - 支持多种频率输出"""
-        value = config["value"]
-        if isinstance(value, dict) and "ref" in value:
-            # 传递频率参数
-            value_with_freq = value.copy()
-            value_with_freq["frequency"] = frequency
-            D1 = self.calculate(data, value_with_freq)
-            
-            # 根据赋值表计算X3
-            if frequency == "yearly" and isinstance(D1, dict):
-                # 处理逐年数据
-                yearly_X3 = {}
-                for year, d1_value in D1.items():
-                    if np.isnan(d1_value):
-                        yearly_X3[year] = np.nan
-                    elif d1_value < 5:
-                        yearly_X3[year] = 1
-                    elif 5 <= d1_value < 10:
-                        yearly_X3[year] = 2
-                    else:
-                        yearly_X3[year] = 3
-                return yearly_X3
-            else:
-                # 处理标量数据
-                if np.isnan(D1):
-                    return np.nan
-                elif D1 < 5:
-                    return 1
-                elif 5 <= D1 < 10:
-                    return 2
-                else:
-                    return 3
-        else:
-            return value
-    
-    def _calculate_bean_moth_X4(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
-        """根据大豆食心虫赋值表计算X4 - 支持多种频率输出"""
-        value = config["value"]
-        if isinstance(value, dict) and "type" in value:
-            # 递归计算子指标，传递频率参数
-            value_with_freq = value.copy()
-            value_with_freq["frequency"] = frequency
-            return self.calculate(data, value_with_freq)
-        else:
-            return value
     
     def _calculate_standardize(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
         """标准化处理 - 支持多种频率输出"""

@@ -166,35 +166,46 @@ class WIWH_PZ:
         station_composite_values = {}
         valid_station_count = 0
 
-        # print(station_indicators)
-        for station_id, station_values in station_indicators.items():
+        # 获取公式配置
+        formula_config = crop_config.get("formula", {})
+        if not formula_config:
+            raise ValueError("未找到公式配置")
+
+        indicator_names = list(crop_config.get("indicators", {}).keys())
+
+        # 创建计算器（自动计算数据范围）
+        calculator = StandardizationCalculator(station_indicators, indicator_names)
+
+        # 计算所有站点的隶属度
+        new_station_indicators = calculator.calculate_all_stations_normalization(formula_config)
+        print(new_station_indicators)
+        for station_id, station_values in new_station_indicators.items():
             try:
+                station_values_normalized = station_values
                 # 存储某个站的多个指标，与calculate_grid接口保持一致
                 station_indicators_dict = {}
                 for indicator_name in crop_config.get("indicators", {}).keys():
 
-                    if isinstance(station_values, dict) and indicator_name in station_values:
+                    if isinstance(station_values_normalized, dict) and indicator_name in station_values_normalized:
                         # 处理字典格式的指标数据（如食心虫的X1-X4）
-                        station_indicators_dict[indicator_name] = station_values[indicator_name]
+                        station_indicators_dict[indicator_name] = station_values_normalized[indicator_name]
                     else:
                         # 处理直接数值格式
-                        station_indicators_dict[indicator_name] = station_values
+                        station_indicators_dict[indicator_name] = station_values_normalized
+
+                # 在站点级别计算综合指标
+                composite_value = self.calculate_grid(station_indicators_dict, crop_config)
+
+                if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
+                    station_composite_values[station_id] = composite_value['data'][0]
+                    valid_station_count += 1
+                else:
+                    station_composite_values[station_id] = np.nan
+                    print(f"站点 {station_id} 计算失败，结果为NaN")
 
             except Exception as e:
                 print(f"站点 {station_id} 计算异常: {str(e)}")
                 station_composite_values[station_id] = np.nan
-        # print(station_composite_values)
-        # breakpoint()
-
-        # 在站点级别计算综合指标
-        composite_value = self.calculate_grid(station_indicators_dict, crop_config)
-
-        if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
-            station_composite_values[station_id] = composite_value['data'][0]
-            valid_station_count += 1
-        else:
-            station_composite_values[station_id] = np.nan
-            print(f"站点 {station_id} 计算失败，结果为NaN")
 
         print(f"成功计算综合指标的站点数: {valid_station_count}/{len(station_indicators)}")
 
@@ -623,8 +634,269 @@ class WIWH_PZ:
         return gdal.GDT_Float32
 
 
+'''
+原始数据 station_indicators
+     ↓
+计算全局极值范围 (1961-2023所有数据)
+     ↓
+计算各站点年平均值  
+     ↓
+分析公式系数 → 确定相关关系
+     ↓
+归一化计算 (基于全局极值和年平均值)
+     ↓
+输出 new_station_indicators
+'''
 
 
+class StandardizationCalculator:
+    def __init__(self, station_indicators, indicator_names):
+        """
+        初始化标准化计算器
+
+        Parameters:
+        station_indicators: 站点数据字典
+        indicator_names: 指标名称列表，如 ['Tmax', 'Tmin', 'Pred']
+        """
+        self.station_indicators = station_indicators
+        self.indicator_names = indicator_names
+        self.data_range = self._calculate_data_range_from_all_years()
+        self._print_data_range_info()
+
+    def _calculate_data_range_from_all_years(self):
+        """
+        根据所有站点所有年份的原始数据计算每个指标的最小最大值
+
+        Returns:
+        data_range: 包含每个指标min和max的字典
+        """
+        data_range = {}
+
+        # 初始化每个指标的最小最大值
+        for indicator_name in self.indicator_names:
+            data_range[indicator_name] = {
+                'min': float('inf'),
+                'max': float('-inf')
+            }
+
+        # 遍历所有站点所有年份的原始数据
+        for station_id, station_data in self.station_indicators.items():
+            for indicator_name in self.indicator_names:
+                if indicator_name in station_data:
+                    for year, value in station_data[indicator_name].items():
+                        # 跳过NaN值
+                        if not np.isnan(value):
+                            # 更新最小值
+                            if value < data_range[indicator_name]['min']:
+                                data_range[indicator_name]['min'] = value
+                            # 更新最大值
+                            if value > data_range[indicator_name]['max']:
+                                data_range[indicator_name]['max'] = value
+
+        # 处理没有有效数据的情况
+        for indicator_name in self.indicator_names:
+            if data_range[indicator_name]['min'] == float('inf'):
+                data_range[indicator_name]['min'] = 0
+                data_range[indicator_name]['max'] = 1
+                print(f"警告: 指标 {indicator_name} 没有有效数据，使用默认范围 [0, 1]")
+            elif data_range[indicator_name]['min'] == data_range[indicator_name]['max']:
+                # 如果所有值都相同，添加一个小偏移量避免除零
+                data_range[indicator_name]['min'] -= 0.1
+                data_range[indicator_name]['max'] += 0.1
+                print(f"警告: 指标 {indicator_name} 所有值相同，调整范围避免除零")
+
+        return data_range
+
+    def _calculate_annual_means(self):
+        """
+        计算每个站点每个指标的年平均值
+
+        Returns:
+        annual_means: 字典，格式为 {station_id: {indicator_name: mean_value}}
+        """
+        annual_means = {}
+
+        for station_id, station_data in self.station_indicators.items():
+            annual_means[station_id] = {}
+
+            for indicator_name in self.indicator_names:
+                if indicator_name in station_data:
+                    # 收集所有年份的有效值
+                    values = []
+                    for year, value in station_data[indicator_name].items():
+                        if not np.isnan(value):
+                            values.append(value)
+
+                    # 计算平均值
+                    if values:
+                        annual_means[station_id][indicator_name] = np.mean(values)
+                    else:
+                        annual_means[station_id][indicator_name] = np.nan
+                else:
+                    annual_means[station_id][indicator_name] = np.nan
+
+        return annual_means
+
+    def _print_data_range_info(self):
+        """打印数据范围信息"""
+        for indicator_name, range_info in self.data_range.items():
+            # 统计总数据点数量
+            total_points = 0
+            valid_points = 0
+
+            for station_id, station_data in self.station_indicators.items():
+                if indicator_name in station_data:
+                    for year, value in station_data[indicator_name].items():
+                        total_points += 1
+                        if not np.isnan(value):
+                            valid_points += 1
+
+            print(f"{indicator_name}:")
+            print(f"  历史范围: [{range_info['min']:.4f}, {range_info['max']:.4f}]")
+            print(f"  有效数据点: {valid_points}/{total_points} ({valid_points / max(total_points, 1) * 100:.1f}%)")
+            print()
+
+    def calculate_membership(self, X, ref_var, correlation_type="positive"):
+        """
+        计算隶属度值 U(X)
+
+        Parameters:
+        X: 输入值（年平均值）
+        ref_var: 参考变量名
+        correlation_type: 相关类型 "positive" 或 "negative"
+        """
+        if ref_var not in self.data_range:
+            raise ValueError(f"未找到变量 {ref_var} 的数据范围")
+
+        X_min = self.data_range[ref_var]['min']  # 1961-2023所有年份最小值
+        X_max = self.data_range[ref_var]['max']  # 1961-2023所有年份最大值
+
+        if X_max == X_min:
+            return 0.5  # 避免除零错误
+
+        # 处理NaN值
+        if np.isnan(X):
+            return np.nan
+
+        if correlation_type == "positive":
+            # 正相关公式: U(X) = (X - X_min) / (X_max - X_min)
+            return (X - X_min) / (X_max - X_min)
+        else:
+            # 负相关公式: U(X) = (X_max - X) / (X_max - X_min)
+            return (X_max - X) / (X_max - X_min)
+
+    def analyze_correlation_from_formula(self, formula_config):
+        """
+        根据公式配置自动分析相关关系
+
+        Parameters:
+        formula_config: 公式配置字典
+
+        Returns:
+        correlation_config: 相关关系配置字典
+        """
+        formula_str = formula_config["formula"]
+        variables_config = formula_config["variables"]
+
+        # 清理公式字符串
+        clean_formula = formula_str.replace(' ', '')
+
+        correlation_config = {}
+
+        for var_name, var_config in variables_config.items():
+            indicator_name = var_config["ref"]
+
+            if var_name in clean_formula:
+                # 找到变量在公式中的位置
+                var_index = clean_formula.find(var_name)
+
+                if var_index == 0:
+                    # 变量在开头，系数为1（正）
+                    correlation_config[indicator_name] = "positive"
+                else:
+                    # 查找系数部分
+                    coeff_part = clean_formula[:var_index]
+
+                    # 从右向左查找运算符
+                    last_operator_pos = -1
+                    for i in range(len(coeff_part) - 1, -1, -1):
+                        if coeff_part[i] in ['+', '-']:
+                            last_operator_pos = i
+                            break
+
+                    if last_operator_pos >= 0:
+                        coeff_str = coeff_part[last_operator_pos:]
+                    else:
+                        coeff_str = coeff_part
+
+                    if coeff_str.startswith('-'):
+                        correlation_config[indicator_name] = "negative"
+                    else:
+                        correlation_config[indicator_name] = "positive"
+            else:
+                # 变量不在公式中，默认正相关
+                correlation_config[indicator_name] = "positive"
+
+        print("自动分析的相关关系:", correlation_config)
+        return correlation_config
+
+    def calculate_all_stations_normalization(self, formula_config):
+        """
+        计算所有站点的结果，根据standardize字段决定是否进行归一化
+
+        Parameters:
+        formula_config: 公式配置字典
+
+        Returns:
+        new_station_indicators: 包含结果值的字典
+        """
+        # 检查是否需要进行归一化
+        standardize = formula_config.get("standardize", "True").lower() == "true"
+
+        # 计算年平均值
+        annual_means = self._calculate_annual_means()
+
+        # 新的station_indicators结构
+        new_station_indicators = {}
+
+        if standardize:
+            # 需要归一化：自动分析相关关系并进行归一化
+            correlation_config = self.analyze_correlation_from_formula(formula_config)
+            print(f"进行归一化计算，相关关系: {correlation_config}")
+        else:
+            # 不需要归一化
+            print("不进行归一化，直接返回年平均值")
+
+        for station_id, means in annual_means.items():
+            # 初始化新结构
+            new_station_indicators[station_id] = {}  # 只包含结果值
+
+            # 计算结果值
+            if standardize:
+                # 计算归一化值
+                for indicator_name in self.indicator_names:
+                    mean_value = means.get(indicator_name, np.nan)
+
+                    if not np.isnan(mean_value) and indicator_name in correlation_config:
+                        correlation_type = correlation_config[indicator_name]
+                        normalized_value = self.calculate_membership(
+                            mean_value, indicator_name, correlation_type
+                        )
+                        new_station_indicators[station_id][indicator_name] = normalized_value
+                    else:
+                        new_station_indicators[station_id][indicator_name] = np.nan
+            else:
+                # 直接使用年平均值作为结果值
+                for indicator_name in self.indicator_names:
+                    mean_value = means.get(indicator_name, np.nan)
+                    new_station_indicators[station_id][indicator_name] = mean_value
+
+            # # 统计有效值数量
+            # valid_count = sum(1 for value in new_station_indicators[station_id].values()
+            #                   if not np.isnan(value))
+            # print(f"站点 {station_id} 完成，有效结果指标: {valid_count}/{len(self.indicator_names)}")
+
+        return new_station_indicators
 
 
 

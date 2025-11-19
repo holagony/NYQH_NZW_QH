@@ -605,7 +605,7 @@ class WIWH_ZH:
         config = params['config']
         disaster_type = config['element']
         self._algorithms = params['algorithms']
-        if disaster_type == 'drought':
+        if disaster_type == 'GH':
             return self.calculate_drought(params)
         elif disaster_type == 'freeze':  # 晚霜冻
             return self.calculate_freeze(params)

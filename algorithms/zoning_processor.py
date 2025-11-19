@@ -95,7 +95,7 @@ class ZoningProcessor:
         # 设置中间结果输出路径
         intermediate_dir = Path(self.result_path) / "intermediate"
         intermediate_dir.mkdir(parents=True, exist_ok=True)
-        self.intermediate_output = intermediate_dir / intermediate_filename   
+        self.intermediate_output = intermediate_dir / intermediate_filename
         
         # self.fjson.log(f"配置加载完成")
     
@@ -114,11 +114,12 @@ class ZoningProcessor:
             if not os.path.exists(self.intermediate_output):
                 self.data_manager.calculate_indicators_for_stations(
                     station_ids, self.indicator_configs, self.start_date, self.end_date, self.intermediate_output
-                ) 
+                )
+
             self.fjson.info("指标计算完成")     
             # 读取站点数据
             station_indicators, station_coords = self._prepare_station_data(self.intermediate_output, self.indicator_configs)
-          
+
             # 3. 执行区划计算
             zoning_result = self._execute_zoning_calculation(station_indicators,station_coords)
             self.fjson.info("区划计算完成") 
