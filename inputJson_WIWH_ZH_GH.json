@@ -1,0 +1,22 @@
+{
+  "taskId": "123456",
+  "algoFrom": "zoning_410000_WIWH_ZH",
+  "cropCode": "WIWH",
+  "zoningType": "ZH",
+  "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
+  "areaCode": "410000",
+  "areaName": "河南省",
+  "element": "GH",
+  "startDate": "19910101",
+  "endDate": "20201231",
+  "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/410000_30grid_wgs84.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_410000.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/410000_wgs84.shp",
+  "otherFilesPath": "",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought",
+  "algorithmConfig": {}
+}

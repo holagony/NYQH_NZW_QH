@@ -173,6 +173,116 @@ def index(x):
     else:
         return np.nan
         
+def calculate_tmin0(daily_data):
+    """
+    ≤0℃
+    平均天数, 逐年天数
+    """
+    df = daily_data.copy()
+    TMIN = df["tmin"]
+    #统计4月1日到4月30日日最低气温小于0℃的天数
+    april_cold_days_by_year = {}
+    
+    # 获取所有年份
+    all_years = TMIN.index.year.unique()
+    
+    for year in all_years:
+        # 筛选该年4月1日到4月30日的数据
+        april_data = TMIN[
+            (TMIN.index.year == year) & 
+            (TMIN.index.month == 4) & 
+            (TMIN.index.day >= 1) & 
+            (TMIN.index.day <= 30)
+        ]
+        
+        # 统计日最低气温小于0℃的天数
+        cold_days_count = len(april_data[april_data < 0])
+        april_cold_days_by_year[year] = cold_days_count
+    
+    # 计算统计值
+    if april_cold_days_by_year:
+        cold_days_values = list(april_cold_days_by_year.values())
+        mean_cold_days = np.mean(cold_days_values)
+        max_cold_days = np.max(cold_days_values)
+        min_cold_days = np.min(cold_days_values)
+    else:
+        mean_cold_days = 0
+        max_cold_days = 0
+        min_cold_days = 0
+    
+    
+    return mean_cold_days, cold_days_values
+
+
+
+def calculate_tmin1(daily_data):
+    """
+    ≤-1.5℃
+    平均天数, 逐年的天数
+    """
+    df = daily_data.copy()
+    TMIN = df["tmin"]
+    #统计4月1日到4月30日日最低气温小于0℃的天数
+    april_cold_days_by_year = {}
+    
+    # 获取所有年份
+    all_years = TMIN.index.year.unique()
+    
+    for year in all_years:
+        # 筛选该年4月1日到4月30日的数据
+        april_data = TMIN[
+            (TMIN.index.year == year) & 
+            (TMIN.index.month == 4) & 
+            (TMIN.index.day >= 1) & 
+            (TMIN.index.day <= 30)
+        ]
+        
+        # 统计日最低气温小于0℃的天数
+        cold_days_count = len(april_data[april_data < (-1.5)])
+        april_cold_days_by_year[year] = cold_days_count
+    
+    # 计算统计值
+    if april_cold_days_by_year:
+        cold_days_values = list(april_cold_days_by_year.values())
+        mean_cold_days = np.mean(cold_days_values)
+        max_cold_days = np.max(cold_days_values)
+        min_cold_days = np.min(cold_days_values)
+    else:
+        mean_cold_days = 0
+        max_cold_days = 0
+        min_cold_days = 0
+    
+    
+    return mean_cold_days, cold_days_values
+
+
+
+def normalize_values(values,min_val,max_val):
+    """
+    归一化数值到0-1范围
+    """
+    if not values:
+        return []
+    
+    valid_values = [v for v in values if v is not None and not np.isnan(v)]
+    if not valid_values:
+        return [0.0] * len(values)
+        
+    # 如果所有值都相同，归一化到0.5
+    if max_val == min_val:
+        return [0.5 if v is not None and not np.isnan(v) else 0.0 for v in values]
+    
+    normalized = []
+    for v in values:
+        if v is None or np.isnan(v):
+            normalized.append(0.0)
+        else:
+            norm_val = (v - min_val) / (max_val - min_val)
+            normalized.append(norm_val)
+    
+    return normalized        
+        
+        
 class WIWH_ZH:
     '''
     河南-冬小麦-灾害区划
@@ -548,12 +658,7 @@ class WIWH_ZH:
             'type': '河南冬小麦干旱'
         }
 
-    def calculate_freeze(self, params):
-        '''
-        霜冻区划
-        计算代码写这里
-        '''
-        pass
+
 
     def calculate_dry(self, params):
         '''
@@ -600,6 +705,111 @@ class WIWH_ZH:
             print(f"小麦连阴雨风险计算失败: {str(e)}")
             result = np.nan
         return result
+    def _calculate_frost(self, params):
+        """霜冻灾害风险指数模型"""
+        station_coords = params.get('station_coords', {})
+        algorithm_config = params.get('algorithmConfig', {})
+        cfg = params.get('config', {})
+        data_dir = cfg.get('inputFilePath')
+        station_file = cfg.get('stationFilePath')
+
+        dm = DataManager(data_dir, station_file, multiprocess=False, num_processes=1)
+        station_ids = list(station_coords.keys())
+        if not station_ids:
+            station_ids = dm.get_all_stations()
+        available = set(dm.get_all_stations())
+
+        station_ids = [sid for sid in station_ids if sid in available]
+        start_date = cfg.get('startDate')
+        end_date = cfg.get('endDate')
+        
+        # 第一步：收集所有站点的d0和d1值
+        station_d0_values = []
+        station_d1_values = []
+        station_d0_list =[]
+        station_d1_list =[]
+        station_data_map = {}  # 存储站点数据以便后续使用
+        
+        print("收集所有站点的d0和d1值...")
+        for sid in station_ids:
+            daily = dm.load_station_data(sid, start_date, end_date)
+            station_data_map[sid] = daily
+            d0,d0list=calculate_tmin0(daily)
+            d1,d1list=calculate_tmin1(daily)
+            station_d0_values.append(d0)
+            station_d1_values.append(d1)
+            station_d0_list.extend(d0list)
+            station_d1_list.extend(d1list)
+            #print(f"站点 {sid}: Ih={Ih:.4f}, Dv={Dv:.4f}")
+        min_val_d0=min(station_d0_list)
+        max_val_d0=max(station_d0_list)
+        min_val_d1=min(station_d1_list)
+        max_val_d1=max(station_d1_list)
+        # 第二步：对所有站点的d0\d1进行归一化
+        normalized_d0 = normalize_values(station_d0_values,min_val_d0,max_val_d0)
+        normalized_d1 = normalize_values(station_d1_values,min_val_d1,max_val_d1)
+        
+        # 输出归一化前后的统计信息
+        if station_d0_values and station_d1_values:
+            valid_d0 = [v for v in station_d0_values if v is not None and not np.isnan(v)]
+            valid_d1 = [v for v in station_d1_values if v is not None and not np.isnan(v)]
+            if valid_d0 and valid_d1:
+                print(f"d0原始范围: {min(valid_d0):.4f} ~ {max(valid_d0):.4f}")
+                print(f"d1原始范围: {min(valid_d1):.4f} ~ {max(valid_d1):.4f}")
+                print(f"d0归一化范围: {min(normalized_d0):.4f} ~ {max(normalized_d0):.4f}")
+                print(f"d1归一化范围: {min(normalized_d1):.4f} ~ {max(normalized_d1):.4f}")
+        
+        # 第三步：使用归一化后的d0和d1计算每个站点的W值
+        station_values: Dict[str, float] = {}
+        for i, sid in enumerate(station_ids):
+            d0_norm = normalized_d0[i]
+            d1_norm = normalized_d1[i]
+            # 使用归一化后的值计算:low_value = 0.3 * d0_norm + 0.7 * d1_norm
+            low_value = 0.3 * d0_norm + 0.7 * d1_norm
+            station_values[sid] = float(low_value) if np.isfinite(low_value) else np.nan
+            print(f"站点 {sid}: d0_norm={d0_norm:.4f}, d1_norm={d1_norm:.4f}, low_value={low_value:.4f}")
+        
+        # 第四步：插值计算
+        interp_conf = algorithm_config.get('interpolation', {})
+        method = str(interp_conf.get('method', 'idw')).lower()
+        iparams = interp_conf.get('params', {})
+
+        if 'var_name' not in iparams:
+            iparams['var_name'] = 'value'
+
+        interp_data = {
+            'station_values': station_values,
+            'station_coords': station_coords,
+            'grid_path': cfg.get('gridFilePath'),
+            'dem_path': cfg.get('demFilePath'),
+            'area_code': cfg.get('areaCode'),
+            'shp_path': cfg.get('shpFilePath')
+        }
+
+        if method == 'lsm_idw':
+            result = LSMIDWInterpolation().execute(interp_data, iparams)
+        else:
+            result = IDWInterpolation().execute(interp_data, iparams)
+            
+        # 分级
+        class_conf = algorithm_config.get('classification', {})
+        key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
+        classificator = params.get('algorithms', {})[key]    
+        # 执行
+        classdata = classificator.execute(result["data"], class_conf) 
+               
+        return {
+            'data': classdata,
+            'meta': {
+                'width': result['meta']['width'],
+                'height': result['meta']['height'],
+                'transform': result['meta']['transform'],
+                'crs': result['meta']['crs']
+            },
+            'type': '河南冬小麦晚霜冻'
+        }
+
+                 
 
     def calculate(self, params):
         config = params['config']
@@ -607,8 +817,8 @@ class WIWH_ZH:
         self._algorithms = params['algorithms']
         if disaster_type == 'GH':
             return self.calculate_drought(params)
-        elif disaster_type == 'freeze':  # 晚霜冻
-            return self.calculate_freeze(params)
+        elif disaster_type == 'CJWSD':  # 晚霜冻
+            return self._calculate_frost(params)
         elif disaster_type == 'dry':  # 干热风
             return self.calculate_dry(params)
         elif disaster_type == 'LCY':  # 麦收区连阴雨

@@ -15,10 +15,11 @@ from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
 import os
 from osgeo import gdal
 from scipy.ndimage import sobel
+from pathlib import Path
 
 
 def _sat_vapor_pressure(T):
-    return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa)，T为气温(°C)
+    return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa),T为气温(°C)
 
 
 def _slope_delta(T):
@@ -71,7 +72,7 @@ def penman_et0(daily_data, lat_deg, elev_m, albedo=0.23, as_coeff=0.25, bs_coeff
     sigma = 4.903e-9
     tmaxK = tmax + 273.16
     tminK = tmin + 273.16
-    # 净长波辐射，含湿度与云量校正
+    # 净长波辐射,含湿度与云量校正
     Rnl = sigma * (
         (tmaxK**4 + tminK**4) / 2.0) * (0.34 - 0.14 * np.sqrt(np.maximum(ea, 0))) * (1.35 * np.minimum(Rs / np.maximum(Rso, 1e-6), 1.0) - 0.35)
     Rn = Rns - Rnl
@@ -133,6 +134,7 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     return df
 
 
+
 class SPSO_ZH:
     '''
     黑龙江-大豆-灾害区划
@@ -141,6 +143,186 @@ class SPSO_ZH:
     大豆霜冻 TODO
     大豆渍涝 TODO
     '''
+    def _get_algorithm(self, algorithm_name: str) -> Any:
+        """获取算法实例"""
+        if algorithm_name not in self._algorithms:
+            raise ValueError(f"不支持的算法: {algorithm_name}")
+        return self._algorithms[algorithm_name]
+
+    def _interpolate_risk(self, data, station_coords, config, crop_config,type):
+        interpolation = crop_config.get("interpolation")
+        interpolation_method = interpolation.get('method', 'lsm_idw')
+        interpolation_params = interpolation.get('params', {})
+        
+        interpolator = self._get_algorithm(f"interpolation.{interpolation_method}")
+        
+        if interpolator is None:
+            raise ValueError(f"不支持的插值方法: {interpolation_method}")
+        
+        print(f"使用 {interpolation_method} 方法对综合风险指数进行插值")
+        
+        # 准备插值数据
+        interpolation_data = {
+            'station_values': data,
+            'station_coords': station_coords,
+            'dem_path': config.get("demFilePath", ""),
+            'shp_path': config.get("shpFilePath", ""),
+            'grid_path': config.get("gridFilePath", ""),
+            'area_code': config.get("areaCode", "")
+        }
+        
+        # 执行插值
+        try:
+            interpolated_result = interpolator.execute(interpolation_data, interpolation_params)
+            print(f"{type}指数插值完成")
+            # 保存中间结果
+            self._save_intermediate_result(interpolated_result, config,type)
+            
+            return interpolated_result
+            
+        except Exception as e:
+            print(f"{type}指数插值失败: {str(e)}")
+            raise
+    
+
+    def _save_intermediate_result(self, result: Dict[str, Any], params: Dict[str, Any], 
+                                indicator_name: str) -> None:
+        """保存中间结果 - 各个指标的插值结果"""
+        try:
+            print(f"保存中间结果: {indicator_name}")
+            
+            # 生成中间结果文件名
+            file_name = indicator_name+".tif"
+            intermediate_dir = Path(params["resultPath"]) / "intermediate"
+            intermediate_dir.mkdir(parents=True, exist_ok=True)
+            output_path = intermediate_dir / file_name
+            
+            # 使用与最终结果相同的保存逻辑
+            if isinstance(result, dict) and 'data' in result and 'meta' in result:
+                data = result['data']
+                meta = result['meta']
+            elif hasattr(result, 'data') and hasattr(result, 'meta'):
+                data = result.data
+                meta = result.meta
+            else:
+                print(f"警告: 中间结果 {indicator_name} 格式不支持,跳过保存")
+                return
+            meta["nodata"] = -32768
+            # 保存为GeoTIFF
+            self._save_geotiff_gdal(data, meta, output_path)
+            
+        except Exception as e:
+            print(f"保存中间结果 {indicator_name} 失败: {str(e)}")
+            # 不抛出异常,继续处理其他指标
+
+    def _save_geotiff_gdal(self, data: np.ndarray, meta: Dict[str, Any], output_path: Path) -> None:
+        """使用GDAL保存为GeoTIFF文件"""
+        try:
+            from osgeo import gdal, osr
+            
+            # 确保数据是2D的
+            if len(data.shape) == 1:
+                # 如果是1D数据，需要知道宽度和高度才能重塑
+                if meta.get('width') and meta.get('height'):
+                    data = data.reshape((meta['height'], meta['width']))
+                else:
+                    # 如果不知道形状，创建为1行N列
+                    data = data.reshape((1, -1))
+            elif len(data.shape) > 2:
+                data = data.squeeze()  # 移除单维度
+            
+            # 获取数据形状
+            height, width = data.shape
+            
+            # 根据输入数据的 dtype 确定 GDAL 数据类型
+            if data.dtype == np.uint8:
+                datatype = gdal.GDT_Byte
+            elif data.dtype == np.uint16:
+                datatype = gdal.GDT_UInt16
+            elif data.dtype == np.int16:
+                datatype = gdal.GDT_Int16
+            elif data.dtype == np.uint32:
+                datatype = gdal.GDT_UInt32
+            elif data.dtype == np.int32:
+                datatype = gdal.GDT_Int32
+            elif data.dtype == np.float32:
+                datatype = gdal.GDT_Float32
+            elif data.dtype == np.float64:
+                datatype = gdal.GDT_Float64
+            else:
+                datatype = gdal.GDT_Float32  # 默认情况
+                
+            # 创建GeoTIFF文件
+            driver = gdal.GetDriverByName('GTiff')
+            
+            # 创建数据集
+            dataset = driver.Create(
+                str(output_path),
+                width,
+                height,
+                1,  # 波段数
+                datatype,
+                ['COMPRESS=LZW']  # 使用LZW压缩
+            )
+            
+            if dataset is None:
+                raise ValueError(f"无法创建文件: {output_path}")
+            
+            # 设置地理变换参数
+            transform = meta.get('transform')
+            dataset.SetGeoTransform(transform)
+            
+            # 设置投影
+            crs = meta.get('crs')
+            if crs is not None:
+                dataset.SetProjection(crs)
+            else:
+                print("警告: 没有坐标参考系统信息")
+            
+            # 获取波段并写入数据
+            band = dataset.GetRasterBand(1)
+            band.WriteArray(data)
+            
+            # 设置无数据值
+            nodata = meta.get('nodata')
+            if nodata is not None:
+                band.SetNoDataValue(float(nodata))
+            
+            # 关闭数据集，确保数据写入磁盘
+            dataset = None
+            
+            print(f"GeoTIFF文件保存成功: {output_path}")
+            
+        except ImportError as e:
+            print(f"导入GDAL失败: {str(e)}")
+        except Exception as e:
+            print(f"使用GDAL保存GeoTIFF失败: {str(e)}")
+            raise
+
+    def _numpy_to_gdal_dtype(self, numpy_dtype: np.dtype) -> int:
+        """将numpy数据类型转换为GDAL数据类型"""
+        from osgeo import gdal
+        
+        dtype_map = {
+            np.bool_: gdal.GDT_Byte,
+            np.uint8: gdal.GDT_Byte,
+            np.uint16: gdal.GDT_UInt16,
+            np.int16: gdal.GDT_Int16,
+            np.uint32: gdal.GDT_UInt32,
+            np.int32: gdal.GDT_Int32,
+            np.float32: gdal.GDT_Float32,
+            np.float64: gdal.GDT_Float64,
+            np.complex64: gdal.GDT_CFloat32,
+            np.complex128: gdal.GDT_CFloat64
+        }
+        
+        for np_type, gdal_type in dtype_map.items():
+            if np.issubdtype(numpy_dtype, np_type):
+                return gdal_type
+        
+        # 默认使用Float32
+        print(f"警告: 无法映射numpy数据类型 {numpy_dtype}，默认使用GDT_Float32")
+        return gdal.GDT_Float32
 
     def drought_station_g(self, data, config):
         '''
@@ -169,9 +351,9 @@ class SPSO_ZH:
         if series.empty:
             return np.nan
 
-        # 计算逐年CWDI的均值，用于后续标准化
+        # 计算逐年CWDI的均值,用于后续标准化
         cwdi_mean = series.groupby(series.index.year).transform('mean')
-        # 将CWDI标准化为相对干旱指数，范围0~1
+        # 将CWDI标准化为相对干旱指数,范围0~1
         cwdi_a = (series - cwdi_mean) / (100 - cwdi_mean)
         # 获取所有年份并排序
         years = sorted(cwdi_a.index.year.unique())
@@ -182,7 +364,7 @@ class SPSO_ZH:
             if sub.empty:
                 continue
             v = sub.values
-            # 若最大值超过1，说明单位可能是%，需缩放到0~1
+            # 若最大值超过1,说明单位可能是%,需缩放到0~1
             if np.nanmax(v) > 1.0:
                 v = v / 100.0
             # 标记干旱事件：连续超过阈值0.4
@@ -200,6 +382,29 @@ class SPSO_ZH:
             return np.nan
         # 返回多年平均干旱强度作为站点干旱风险G值
         return float(np.mean(stotals))
+
+    def calculate_ZL_HazardRisk(self, station_indicators,params):
+        ZL={}
+
+        for station_id, indicators in station_indicators.items():
+
+            # 获取基础指标
+            D50 = indicators.get('D50', np.nan)  # 总降水量
+            D100 = indicators.get('D100', np.nan)  # 总日照时数
+            D250 = indicators.get('D250', np.nan)  # 降水日数
+
+            # 计算单站点致灾因子危险性指数
+            result=0.25*D50+0.3*D100+0.5*D250
+            ZL[station_id] = result
+
+        filename = f'黑龙江大豆致灾因子危险性指数.csv'
+        result_df = pd.DataFrame(list(ZL.items()),columns=['站点ID', '致灾因子危险性指数'])
+        intermediate_dir = Path(params["resultPath"]) / "intermediate"
+        intermediate_dir.mkdir(parents=True, exist_ok=True)
+        output_path = intermediate_dir / filename
+        result_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+        print(f'黑龙江大豆致灾因子危险性指数站点级数据已保存至：{output_path}')
+        return ZL
 
     def calculate_drought(self, params):
         '''
@@ -286,11 +491,24 @@ class SPSO_ZH:
         '''
         计算大豆渍涝指数
         '''
-        pass
+        station_indicators = params['station_indicators']
+        station_coords = params['station_coords']
+        algorithmConfig = params['algorithmConfig']
+        config = params['config']
+        
+        print("开始计算大豆渍涝气候风险区划 ")
+        print("第一步：站点级别计算致灾因子危险性指数")
+        ZL_HazardRisk = self.calculate_ZL_HazardRisk(station_indicators,config)
+
+        print("第二步：对致灾因子危险性指数进行插值")
+        interpolated_ZL_HazardRisk =  self._interpolate_risk(ZL_HazardRisk, station_coords, config, algorithmConfig,'ZL_HazardRisk')
+
 
     def calculate(self, params):
         config = params['config']
         disaster_type = config['element']
+        self._algorithms = params['algorithms']
+
         if disaster_type == 'GH':
             return self.calculate_drought(params)
         elif disaster_type == 'frost':

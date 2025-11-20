@@ -53,7 +53,7 @@ class NaturalBreaksClassification():
             return data
         
         # 获取分级参数
-        num_classes = params.get('num_classes', 4) if params else 4
+        num_classes = params.get('num_classes', 5) if params else 5
         
         # 提取有效值
         valid_data = data[~np.isnan(data)]

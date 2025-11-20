@@ -1,13 +1,14 @@
 from pathlib import Path
 import numpy as np
 from typing import Dict, Any
+import pandas as pd
 
 
 # from algorithms.interpolation import InterpolateTool
 # from algorithms.classification import ClassificationTool
 
 class WIWH_BC:
-    """计算河南小麦病虫害区划计算器"""
+    """计算河南小麦品质气候区划计算器"""
     def __init__(self):
         pass
 
@@ -20,14 +21,14 @@ class WIWH_BC:
         # 根据品质气候类型选择计算方式
         pest_type = config['element']
 
-        if pest_type == 'CMB':
+        if pest_type in ['CMB','TXB'] :
             return self._calculate_element(params)
         else:
             raise ValueError(f"不支持的品质区划类型: {pest_type}")
 
     def _calculate_element(self, params):
         """
-        计算病虫害区划-赤霉病
+        计算品质气候区划-蛋白质气候区划
          - 先计算站点综合风险指数再插值
         """
         station_indicators = params['station_indicators']
@@ -157,74 +158,130 @@ class WIWH_BC:
         return composite_result
 
 
-    def _calculate_before_interpolate(self, station_indicators, station_coords,
-                                      config, crop_config, interpolator, interpolation_params):
-        """先根据站点计算数值，再插值"""
-        print("执行 after 插值顺序: 先根据站点计算数值，再插值")
+    # def _calculate_before_interpolate(self, station_indicators, station_coords,
+    #                                   config, crop_config, interpolator, interpolation_params):
+    #     """先根据站点计算数值，再插值"""
+    #     print("执行 after 插值顺序: 先根据站点计算数值，再插值")
+    #
+    #     # 在站点级别计算综合指标
+    #     station_composite_values = {}
+    #     valid_station_count = 0
+    #
+    #     # 获取公式配置
+    #     formula_config = crop_config.get("formula", {})
+    #     if not formula_config:
+    #         raise ValueError("未找到公式配置")
+    #
+    #     indicator_names = list(crop_config.get("indicators", {}).keys())
+    #
+    #     # 创建计算器（自动计算数据范围）
+    #     calculator = StandardizationCalculator(station_indicators, indicator_names)
+    #
+    #     # 计算所有站点的隶属度
+    #     new_station_indicators = calculator.calculate_all_stations_normalization(formula_config)
+    #
+    #     for station_id, station_values in new_station_indicators.items():
+    #         try:
+    #             station_values_normalized = station_values
+    #             # 存储某个站的多个指标，与calculate_grid接口保持一致
+    #             station_indicators_dict = {}
+    #             for indicator_name in crop_config.get("indicators", {}).keys():
+    #
+    #                 if isinstance(station_values_normalized, dict) and indicator_name in station_values_normalized:
+    #                     # 处理字典格式的指标数据（如食心虫的X1-X4）
+    #                     station_indicators_dict[indicator_name] = station_values_normalized[indicator_name]
+    #                 else:
+    #                     # 处理直接数值格式
+    #                     station_indicators_dict[indicator_name] = station_values_normalized
+    #
+    #             # 在站点级别计算综合指标
+    #             composite_value = self.calculate_grid(station_indicators_dict, crop_config)
+    #
+    #             if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
+    #                 station_composite_values[station_id] = composite_value['data'][0]
+    #                 valid_station_count += 1
+    #             else:
+    #                 station_composite_values[station_id] = np.nan
+    #                 print(f"站点 {station_id} 计算失败，结果为NaN")
+    #
+    #         except Exception as e:
+    #             print(f"站点 {station_id} 计算异常: {str(e)}")
+    #             station_composite_values[station_id] = np.nan
+    #
+    #     print(f"成功计算综合指标的站点数: {valid_station_count}/{len(station_indicators)}")
+    #
+    #     if valid_station_count == 0:
+    #         raise ValueError("所有站点计算综合指标都失败了")
+    #
+    #     # 对综合指标结果进行插值
+    #     try:
+    #         interpolation_data = {
+    #             'station_values': station_composite_values,
+    #             'station_coords': station_coords,
+    #             'dem_path': config.get("demFilePath", ""),
+    #             'shp_path': config.get("shpFilePath", ""),
+    #             'grid_path': config.get("gridFilePath", ""),
+    #             'area_code': config.get("areaCode", "")
+    #         }
+    #
+    #         composite_result = interpolator.execute(interpolation_data, interpolation_params)
+    #         print("综合指标插值完成")
+    #
+    #         # 保存中间结果
+    #         self._save_intermediate_result(composite_result, config, "composite_indicator")
+    #
+    #         return composite_result
+    #
+    #     except Exception as e:
+    #         print(f"综合指标插值失败: {str(e)}")
+    #         raise
 
-        # 在站点级别计算综合指标
-        station_composite_values = {}
-        valid_station_count = 0
-
-        for station_id, station_values in station_indicators.items():
-            # print(station_indicators.items())
-            try:
-                # 存储某个站的多个指标，与calculate_grid接口保持一致
-                station_indicators_dict = {}
-                for indicator_name in crop_config.get("indicators", {}).keys():
-
-                    if isinstance(station_values, dict) and indicator_name in station_values:
-                        # 处理字典格式的指标数据（如食心虫的X1-X4）
-                        station_indicators_dict[indicator_name] = station_values[indicator_name]
-                    else:
-                        # 处理直接数值格式
-                        station_indicators_dict[indicator_name] = station_values
-
-                # 在站点级别计算综合指标
-                composite_value = self.calculate_grid(station_indicators_dict, crop_config)
-
-                if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
-                    station_composite_values[station_id] = composite_value['data'][0]
-                    valid_station_count += 1
-                else:
-                    station_composite_values[station_id] = np.nan
-                    print(f"站点 {station_id} 计算失败，结果为NaN")
-
-            except Exception as e:
-                print(f"站点 {station_id} 计算异常: {str(e)}")
-                station_composite_values[station_id] = np.nan
-
-        print(f"成功计算综合指标的站点数: {valid_station_count}/{len(station_indicators)}")
-
-        if valid_station_count == 0:
-            raise ValueError("所有站点计算综合指标都失败了")
-
-        # 对综合指标结果进行插值
-        try:
-            interpolation_data = {
-                'station_values': station_composite_values,
-                'station_coords': station_coords,
-                'dem_path': config.get("demFilePath", ""),
-                'shp_path': config.get("shpFilePath", ""),
-                'grid_path': config.get("gridFilePath", ""),
-                'area_code': config.get("areaCode", "")
-            }
-
-            composite_result = interpolator.execute(interpolation_data, interpolation_params)
-            print("综合指标插值完成")
-
-            # 保存中间结果
-            self._save_intermediate_result(composite_result, config, "composite_indicator")
-
-            return composite_result
-
-        except Exception as e:
-            print(f"综合指标插值失败: {str(e)}")
-            raise
-
-    def calculate_grid(self, interpolated_indicators: Dict[str, Any],
-                       crop_config: Dict[str, Any]) -> Any:
-        """栅格级别的区划计算 - 支持站点级别和栅格级别计算"""
+    # def calculate_grid(self, indicators: Dict[str, Any],
+    #                    crop_config: Dict[str, Any]) -> Any:
+    #     """栅格级别的区划计算 - 支持站点级别和栅格级别计算"""
+    #     print("执行区划计算")
+    #
+    #     # 获取公式配置
+    #     formula_config = crop_config.get("formula", {})
+    #     if not formula_config:
+    #         raise ValueError("未找到公式配置")
+    #
+    #     # 处理简单引用配置
+    #     if "ref" in formula_config:
+    #         ref_name = formula_config["ref"]
+    #         if ref_name in indicators:
+    #             result = indicators[ref_name]
+    #             print(f"直接返回指标 {ref_name} 的结果")
+    #             return result
+    #         else:
+    #             raise ValueError(f"引用的指标 {ref_name} 不存在")
+    #
+    #     # 处理自定义公式
+    #     formula_type = formula_config.get("type", "")
+    #     formula_str = formula_config.get("formula", "")
+    #     variables_config = formula_config.get("variables", {})
+    #
+    #     print(f"使用公式类型: {formula_type}")
+    #     print(f"公式: {formula_str}")
+    #     print(f"变量配置: {list(variables_config.keys())}")
+    #
+    #     if formula_type != "custom_formula" or not formula_str:
+    #         raise ValueError("不支持的公式类型或公式为空")
+    #
+    #     # 检测计算级别：站点级别还是栅格级别
+    #     calculation_level = self._detect_calculation_level(indicators)
+    #     print(f"检测到计算级别: {calculation_level}")
+    #
+    #     if calculation_level == "station":
+    #         # 站点级别计算
+    #         return self._calculate_station_level(indicators, formula_str, variables_config, crop_config)
+    #     else:
+    #         # 栅格级别计算
+    #         return self._calculate_grid_level(indicators, formula_str, variables_config, crop_config)
+    def calculate_grid(self, indicators: Dict[str, Any],
+                       crop_config: Dict[str, Any],
+                       region_name: str = None) -> Any:
+        """栅格级别的区划计算 - 支持多区域配置"""
         print("执行区划计算")
 
         # 获取公式配置
@@ -235,19 +292,36 @@ class WIWH_BC:
         # 处理简单引用配置
         if "ref" in formula_config:
             ref_name = formula_config["ref"]
-            if ref_name in interpolated_indicators:
-                result = interpolated_indicators[ref_name]
+            if ref_name in indicators:
+                result = indicators[ref_name]
                 print(f"直接返回指标 {ref_name} 的结果")
                 return result
             else:
                 raise ValueError(f"引用的指标 {ref_name} 不存在")
 
-        # 处理自定义公式
-        formula_type = formula_config.get("type", "")
-        formula_str = formula_config.get("formula", "")
-        variables_config = formula_config.get("variables", {})
+        # 选择区域公式
+        if region_name and f"formula_{region_name}" in formula_config:
+            # 使用指定区域的公式
+            region_config = formula_config[f"formula_{region_name}"]
+            print(f"使用指定区域公式: {region_name}")
+        elif "formula_north" in formula_config:
+            # 默认使用北方公式
+            region_config = formula_config["formula_north"]
+            print("使用默认区域公式: north")
+        elif "formula_south" in formula_config:
+            # 默认使用南方公式
+            region_config = formula_config["formula_south"]
+            print("使用默认区域公式: south")
+        else:
+            # 单区域配置
+            region_config = formula_config
+            print("使用单区域公式配置")
 
-        print(f"使用公式类型: {formula_type}")
+        formula_type = region_config.get("type", "")
+        formula_str = region_config.get("formula", "")
+        variables_config = region_config.get("variables", {})
+
+        print(f"公式类型: {formula_type}")
         print(f"公式: {formula_str}")
         print(f"变量配置: {list(variables_config.keys())}")
 
@@ -255,19 +329,19 @@ class WIWH_BC:
             raise ValueError("不支持的公式类型或公式为空")
 
         # 检测计算级别：站点级别还是栅格级别
-        calculation_level = self._detect_calculation_level(interpolated_indicators)
+        calculation_level = self._detect_calculation_level(indicators)
         print(f"检测到计算级别: {calculation_level}")
 
         if calculation_level == "station":
             # 站点级别计算
-            return self._calculate_station_level(interpolated_indicators, formula_str, variables_config, crop_config)
+            return self._calculate_station_level(indicators, formula_str, variables_config, crop_config)
         else:
             # 栅格级别计算
-            return self._calculate_grid_level(interpolated_indicators, formula_str, variables_config, crop_config)
+            return self._calculate_grid_level(indicators, formula_str, variables_config, crop_config)
 
-    def _detect_calculation_level(self, interpolated_indicators: Dict[str, Any]) -> str:
+    def _detect_calculation_level(self, indicators: Dict[str, Any]) -> str:
         """检测计算级别"""
-        for indicator_name, indicator_data in interpolated_indicators.items():
+        for indicator_name, indicator_data in indicators.items():
             if isinstance(indicator_data, dict) and 'data' in indicator_data:
                 data_content = indicator_data['data']
                 if isinstance(data_content, np.ndarray):
@@ -282,7 +356,7 @@ class WIWH_BC:
         # 默认使用栅格级别
         return "grid"
 
-    def _calculate_station_level(self, interpolated_indicators: Dict[str, Any],
+    def _calculate_station_level(self, indicators: Dict[str, Any],
                                  formula_str: str, variables_config: Dict[str, Any],
                                  crop_config: Dict[str, Any]) -> Any:
         """站点级别计算"""
@@ -295,8 +369,8 @@ class WIWH_BC:
         for var_name, var_config in variables_config.items():
             if "ref" in var_config:
                 ref_name = var_config["ref"]
-                if ref_name in interpolated_indicators:
-                    indicator_data = interpolated_indicators[ref_name]
+                if ref_name in indicators:
+                    indicator_data = indicators[ref_name]
 
                     # 提取数据值
                     if isinstance(indicator_data, (int, float)):
@@ -427,6 +501,23 @@ class WIWH_BC:
             # 创建一个与输入栅格相同大小的常量栅格
             first_grid = next(iter(interpolated_indicators.values()))['data']
             return np.full_like(first_grid, value)
+
+    def _standardize_grid(self, grid_data: np.ndarray) -> np.ndarray:
+        """对栅格数据进行标准化"""
+        valid_mask = ~np.isnan(grid_data)
+        if not np.any(valid_mask):
+            return np.full_like(grid_data, np.nan)
+
+        valid_values = grid_data[valid_mask]
+        min_val = np.min(valid_values)
+        max_val = np.max(valid_values)
+
+        if max_val == min_val:
+            return np.full_like(grid_data, 0.5)
+
+        standardized = np.full_like(grid_data, np.nan)
+        standardized[valid_mask] = (valid_values - min_val) / (max_val - min_val)
+        return standardized
 
     def _evaluate_formula(self, formula_str: str, variables_data: Dict[str, np.ndarray]) -> np.ndarray:
         """评估公式"""
@@ -603,8 +694,661 @@ class WIWH_BC:
         print(f"警告: 无法映射numpy数据类型 {numpy_dtype}，默认使用GDT_Float32")
         return gdal.GDT_Float32
 
+    def _calculate_before_interpolate(self, station_indicators, station_coords,
+                                      config, crop_config, interpolator, interpolation_params):
+        """先根据站点计算数值，再插值"""
+        print("执行 after 插值顺序: 先根据站点计算数值，再插值")
+
+        # 在站点级别计算综合指标
+        station_composite_values = {}
+        valid_station_count = 0
+
+        # 获取公式配置
+        formula_config = crop_config.get("formula", {})
+        if not formula_config:
+            raise ValueError("未找到公式配置")
+
+        indicator_names = list(crop_config.get("indicators", {}).keys())
+
+        station_file=config.get('stationFilePath')
+        station_info = self._load_station_info(station_file)
+
+        # 创建计算器（自动计算数据范围）
+        calculator = StandardizationCalculator(station_indicators, indicator_names)
+
+        # 计算所有站点的隶属度
+        new_station_indicators = calculator.calculate_all_stations_normalization(station_info,formula_config)
+
+        # for station_id, station_values in new_station_indicators.items():
+        #     try:
+        #         station_values_normalized = station_values
+        #         # 存储某个站的多个指标，与calculate_grid接口保持一致
+        #         station_indicators_dict = {}
+        #         for indicator_name in crop_config.get("indicators", {}).keys():
+        #
+        #             if isinstance(station_values_normalized, dict) and indicator_name in station_values_normalized:
+        #                 # 处理字典格式的指标数据（如食心虫的X1-X4）
+        #                 station_indicators_dict[indicator_name] = station_values_normalized[indicator_name]
+        #             else:
+        #                 # 处理直接数值格式
+        #                 station_indicators_dict[indicator_name] = station_values_normalized
+        #
+        #         # 在站点级别计算综合指标
+        #         composite_value = self.calculate_grid(station_indicators_dict, crop_config)
+        #
+        #         if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
+        #             station_composite_values[station_id] = composite_value['data'][0]
+        #             valid_station_count += 1
+        #         else:
+        #             station_composite_values[station_id] = np.nan
+        #             print(f"站点 {station_id} 计算失败，结果为NaN")
+        #
+        #     except Exception as e:
+        #         print(f"站点 {station_id} 计算异常: {str(e)}")
+        #         station_composite_values[station_id] = np.nan
+        #
+        # print(f"成功计算综合指标的站点数: {valid_station_count}/{len(station_indicators)}")
+        # 修改后的代码
+
+        # 判断是否为多区域格式
+
+        # 判断是否为多区域格式
+        if isinstance(new_station_indicators, dict) and any(
+                key in ['north', 'south'] for key in new_station_indicators.keys()):
+            # 多区域格式处理
+            for region_name, region_stations in new_station_indicators.items():
+                print(f"处理 {region_name} 区域，共 {len(region_stations)} 个站点")
+
+                for station_id, station_values in region_stations.items():
+                    try:
+                        # 存储某个站的多个指标，与calculate_grid接口保持一致
+                        station_indicators_dict = {}
+
+                        # 遍历station_values中的指标（只包含该区域有的指标）
+                        if isinstance(station_values, dict):
+                            for indicator_name, indicator_value in station_values.items():
+                                # 直接使用station_values中的指标和值
+                                station_indicators_dict[indicator_name] = indicator_value
+                        else:
+                            # 如果不是字典格式，设置为NaN
+                            station_indicators_dict = {indicator_name: np.nan for indicator_name in
+                                                       crop_config.get("indicators", {}).keys()}
+                            print(f"警告: 站点 {station_id} 数据格式异常")
+
+                        # 在站点级别计算综合指标，传递区域信息
+                        composite_value = self.calculate_grid(
+                            station_indicators_dict,
+                            crop_config,
+                            region_name=region_name  # 传递区域名称
+                        )
+
+                        if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
+                            station_composite_values[station_id] = composite_value['data'][0]
+                            valid_station_count += 1
+                        else:
+                            station_composite_values[station_id] = np.nan
+                            print(f"站点 {station_id} 计算失败，结果为NaN")
+
+                    except Exception as e:
+                        station_composite_values[station_id] = np.nan
+                        print(f"站点 {station_id} 计算异常: {str(e)}")
+
+        else:
+            # 单区域格式处理（保持原有逻辑）
+            for station_id, station_values in new_station_indicators.items():
+                try:
+                    station_values_normalized = station_values
+                    # 存储某个站的多个指标，与calculate_grid接口保持一致
+                    station_indicators_dict = {}
+
+                    # 遍历station_values中的指标
+                    if isinstance(station_values_normalized, dict):
+                        for indicator_name, indicator_value in station_values_normalized.items():
+                            station_indicators_dict[indicator_name] = indicator_value
+                    else:
+                        # 处理直接数值格式
+                        for indicator_name in crop_config.get("indicators", {}).keys():
+                            station_indicators_dict[indicator_name] = station_values_normalized
+
+                    # 在站点级别计算综合指标
+                    composite_value = self.calculate_grid(station_indicators_dict, crop_config)
+
+                    if composite_value and 'data' in composite_value and len(composite_value['data']) > 0:
+                        station_composite_values[station_id] = composite_value['data'][0]
+                        valid_station_count += 1
+                        print(f"站点 {station_id} 计算成功: {composite_value['data'][0]:.4f}")
+                    else:
+                        station_composite_values[station_id] = np.nan
+                        print(f"站点 {station_id} 计算失败，结果为NaN")
+
+                except Exception as e:
+                    print(f"站点 {station_id} 计算异常: {str(e)}")
+                    station_composite_values[station_id] = np.nan
+
+        print(f"成功计算 {valid_station_count} 个站点的综合指标")
+
+        if valid_station_count == 0:
+            raise ValueError("所有站点计算综合指标都失败了")
+
+        # 对综合指标结果进行插值
+        try:
+            interpolation_data = {
+                'station_values': station_composite_values,
+                'station_coords': station_coords,
+                'dem_path': config.get("demFilePath", ""),
+                'shp_path': config.get("shpFilePath", ""),
+                'grid_path': config.get("gridFilePath", ""),
+                'area_code': config.get("areaCode", "")
+            }
+
+            composite_result = interpolator.execute(interpolation_data, interpolation_params)
+            print("综合指标插值完成")
+
+            # 保存中间结果
+            self._save_intermediate_result(composite_result, config, "composite_indicator")
+
+            return composite_result
+
+        except Exception as e:
+            print(f"综合指标插值失败: {str(e)}")
+            raise
+
+    def _load_station_info(self,station_file):
+        """加载站点信息文件"""
+        _station_info_cache = {}
+        try:
+            # 读取站点stationFilePath信息文件（GBK编码）
+            station_df = pd.read_csv(station_file, encoding='gbk')
+
+            # 处理列名可能的空格问题
+            station_df.columns = station_df.columns.str.strip()
+
+            # 将站点信息缓存到字典中
+            for _, row in station_df.iterrows():
+                station_id = str(row['站号']).strip()
+                _station_info_cache[station_id] = {
+                    'station_name': row['站名'] if '站名' in row else '',
+                    'station_id': station_id,
+                    'lon': float(row['经度']) if '经度' in row else np.nan,
+                    'lat': float(row['纬度']) if '纬度' in row else np.nan,
+                    'altitude': float(row['海拔']) if '海拔' in row else np.nan,  # 新增海拔字段
+                    'county_code': str(row['县编号']) if '县编号' in row else '',
+                    'PAC': str(row['PAC']) if 'PAC' in row else '',
+                    'county': row['县'] if '县' in row else '',
+                    'province': row['省'] if '省' in row else '',
+                    'city': row['市'] if '市' in row else '',
+                    'PAC_prov': str(row['PAC_prov']) if 'PAC_prov' in row else '',
+                    'PAC_city': str(row['PAC_city']) if 'PAC_city' in row else ''
+                }
+
+            print(f"成功加载 {len(_station_info_cache)} 个站点的信息")
+            return _station_info_cache
+
+        except Exception as e:
+            print(f"加载站点信息文件失败: {str(e)}")
 
 
+
+'''
+原始数据 station_indicators
+     ↓
+计算全局极值范围 (1961-2023所有数据)
+     ↓
+计算各站点年平均值  
+     ↓
+分析公式系数 → 确定相关关系
+     ↓
+归一化计算 (基于全局极值和年平均值)
+     ↓
+输出 new_station_indicators
+'''
+
+
+class StandardizationCalculator:
+    def __init__(self, station_indicators, indicator_names):
+        """
+        初始化标准化计算器
+
+        Parameters:
+        station_indicators: 站点数据字典
+        indicator_names: 指标名称列表，如 ['Tmax', 'Tmin', 'Pred']
+        """
+        self.station_indicators = station_indicators
+        self.indicator_names = indicator_names
+        self.data_range = self._calculate_data_range_from_all_years()
+        self._print_data_range_info()
+
+    def _calculate_data_range_from_all_years(self):
+        """
+        根据所有站点所有年份的原始数据计算每个指标的最小最大值
+
+        Returns:
+        data_range: 包含每个指标min和max的字典
+        """
+        data_range = {}
+
+        # 初始化每个指标的最小最大值
+        for indicator_name in self.indicator_names:
+            data_range[indicator_name] = {
+                'min': float('inf'),
+                'max': float('-inf')
+            }
+
+        # 遍历所有站点所有年份的原始数据
+        for station_id, station_data in self.station_indicators.items():
+            for indicator_name in self.indicator_names:
+                if indicator_name in station_data:
+                    for year, value in station_data[indicator_name].items():
+                        # 跳过NaN值
+                        if not np.isnan(value):
+                            # 更新最小值
+                            if value < data_range[indicator_name]['min']:
+                                data_range[indicator_name]['min'] = value
+                            # 更新最大值
+                            if value > data_range[indicator_name]['max']:
+                                data_range[indicator_name]['max'] = value
+
+        # 处理没有有效数据的情况
+        for indicator_name in self.indicator_names:
+            if data_range[indicator_name]['min'] == float('inf'):
+                data_range[indicator_name]['min'] = 0
+                data_range[indicator_name]['max'] = 1
+                print(f"警告: 指标 {indicator_name} 没有有效数据，使用默认范围 [0, 1]")
+            elif data_range[indicator_name]['min'] == data_range[indicator_name]['max']:
+                # 如果所有值都相同，添加一个小偏移量避免除零
+                data_range[indicator_name]['min'] -= 0.1
+                data_range[indicator_name]['max'] += 0.1
+                print(f"警告: 指标 {indicator_name} 所有值相同，调整范围避免除零")
+
+        return data_range
+
+    def _calculate_annual_means(self):
+        """
+        计算每个站点每个指标的年平均值
+
+        Returns:
+        annual_means: 字典，格式为 {station_id: {indicator_name: mean_value}}
+        """
+        annual_means = {}
+
+        for station_id, station_data in self.station_indicators.items():
+            annual_means[station_id] = {}
+
+            for indicator_name in self.indicator_names:
+                if indicator_name in station_data:
+                    # 收集所有年份的有效值
+                    values = []
+                    for year, value in station_data[indicator_name].items():
+                        if not np.isnan(value):
+                            values.append(value)
+
+                    # 计算平均值
+                    if values:
+                        annual_means[station_id][indicator_name] = np.mean(values)
+                    else:
+                        annual_means[station_id][indicator_name] = np.nan
+                else:
+                    annual_means[station_id][indicator_name] = np.nan
+
+        return annual_means
+
+    def _print_data_range_info(self):
+        """打印数据范围信息"""
+        for indicator_name, range_info in self.data_range.items():
+            # 统计总数据点数量
+            total_points = 0
+            valid_points = 0
+
+            for station_id, station_data in self.station_indicators.items():
+                if indicator_name in station_data:
+                    for year, value in station_data[indicator_name].items():
+                        total_points += 1
+                        if not np.isnan(value):
+                            valid_points += 1
+
+            print(f"{indicator_name}:")
+            print(f"  历史范围: [{range_info['min']:.4f}, {range_info['max']:.4f}]")
+            print(f"  有效数据点: {valid_points}/{total_points} ({valid_points / max(total_points, 1) * 100:.1f}%)")
+            print()
+
+    def calculate_membership(self, X, ref_var, correlation_type="positive"):
+        """
+        计算隶属度值 U(X)
+
+        Parameters:
+        X: 输入值（年平均值）
+        ref_var: 参考变量名
+        correlation_type: 相关类型 "positive" 或 "negative"
+        """
+        if ref_var not in self.data_range:
+            raise ValueError(f"未找到变量 {ref_var} 的数据范围")
+
+        X_min = self.data_range[ref_var]['min']  # 1961-2023所有年份最小值
+        X_max = self.data_range[ref_var]['max']  # 1961-2023所有年份最大值
+
+        if X_max == X_min:
+            return 0.5  # 避免除零错误
+
+        # 处理NaN值
+        if np.isnan(X):
+            return np.nan
+
+        if correlation_type == "positive":
+            # 正相关公式: U(X) = (X - X_min) / (X_max - X_min)
+            return (X - X_min) / (X_max - X_min)
+        else:
+            # 负相关公式: U(X) = (X_max - X) / (X_max - X_min)
+            return (X_max - X) / (X_max - X_min)
+
+    def analyze_correlation_from_formula(self, formula_config):
+        """
+        根据公式配置自动分析相关关系
+
+        Parameters:
+        formula_config: 公式配置字典
+
+        Returns:
+        correlation_config: 相关关系配置字典
+        """
+        formula_str = formula_config["formula"]
+        variables_config = formula_config["variables"]
+
+        # 清理公式字符串
+        clean_formula = formula_str.replace(' ', '')
+
+        correlation_config = {}
+
+        for var_name, var_config in variables_config.items():
+            indicator_name = var_config["ref"]
+
+            if var_name in clean_formula:
+                # 找到变量在公式中的位置
+                var_index = clean_formula.find(var_name)
+
+                if var_index == 0:
+                    # 变量在开头，系数为1（正）
+                    correlation_config[indicator_name] = "positive"
+                else:
+                    # 查找系数部分
+                    coeff_part = clean_formula[:var_index]
+
+                    # 从右向左查找运算符
+                    last_operator_pos = -1
+                    for i in range(len(coeff_part) - 1, -1, -1):
+                        if coeff_part[i] in ['+', '-']:
+                            last_operator_pos = i
+                            break
+
+                    if last_operator_pos >= 0:
+                        coeff_str = coeff_part[last_operator_pos:]
+                    else:
+                        coeff_str = coeff_part
+
+                    if coeff_str.startswith('-'):
+                        correlation_config[indicator_name] = "negative"
+                    else:
+                        correlation_config[indicator_name] = "positive"
+            else:
+                # 变量不在公式中，默认正相关
+                correlation_config[indicator_name] = "positive"
+
+        print("自动分析的相关关系:", correlation_config)
+        return correlation_config
+
+    def _is_multi_region_formula(self,formula_config):
+        """
+        判断是否为多区域公式配置
+        """
+        if not isinstance(formula_config, dict):
+            return False
+
+        # 检查是否包含区域公式键（formula_north, formula_south等）
+        region_keys = [key for key in formula_config.keys() if key.startswith('formula_')]
+
+        # 如果有区域公式键，且数量>=2，则是多区域配置
+        if len(region_keys) >= 1:
+            return True
+
+        # 如果没有区域公式键，但有type和formula字段，则是单区域配置
+        if 'type' in formula_config and 'formula' in formula_config:
+            return False
+
+        # 其他情况默认为单区域
+        return False
+
+    # def calculate_all_stations_normalization(self, formula_config):
+    #     """
+    #     计算所有站点的结果，根据standardize字段决定是否进行归一化
+    #
+    #     Parameters:
+    #     formula_config: 公式配置字典
+    #
+    #     Returns:
+    #     new_station_indicators: 包含结果值的字典
+    #     """
+    #
+    #     # 检查是否需要进行归一化
+    #     standardize = formula_config.get("standardize", "True").lower() == "true"
+    #
+    #     # 计算年平均值
+    #     annual_means = self._calculate_annual_means()
+    #
+    #     # 新的station_indicators结构
+    #     new_station_indicators = {}
+    #
+    #     if standardize:
+    #         # 需要归一化：自动分析相关关系并进行归一化
+    #         correlation_config = self.analyze_correlation_from_formula(formula_config)
+    #         print(f"进行归一化计算，相关关系: {correlation_config}")
+    #     else:
+    #         # 不需要归一化
+    #         print("不进行归一化，直接返回年平均值")
+    #
+    #     for station_id, means in annual_means.items():
+    #         # 初始化新结构
+    #         new_station_indicators[station_id] = {}  # 只包含结果值
+    #
+    #         # 计算结果值
+    #         if standardize:
+    #             # 计算归一化值
+    #             for indicator_name in self.indicator_names:
+    #                 mean_value = means.get(indicator_name, np.nan)
+    #
+    #                 if not np.isnan(mean_value) and indicator_name in correlation_config:
+    #                     correlation_type = correlation_config[indicator_name]
+    #                     normalized_value = self.calculate_membership(
+    #                         mean_value, indicator_name, correlation_type
+    #                     )
+    #                     new_station_indicators[station_id][indicator_name] = normalized_value
+    #                 else:
+    #                     new_station_indicators[station_id][indicator_name] = np.nan
+    #         else:
+    #             # 直接使用年平均值作为结果值
+    #             for indicator_name in self.indicator_names:
+    #                 mean_value = means.get(indicator_name, np.nan)
+    #                 new_station_indicators[station_id][indicator_name] = mean_value
+    #
+    #         # # 统计有效值数量
+    #         # valid_count = sum(1 for value in new_station_indicators[station_id].values()
+    #         #                   if not np.isnan(value))
+    #         # print(f"站点 {station_id} 完成，有效结果指标: {valid_count}/{len(self.indicator_names)}")
+    #
+    #     return new_station_indicators
+    def calculate_all_stations_normalization(self, station_info, formula_config):
+        """
+        计算所有站点的结果，根据standardize字段决定是否进行归一化
+        支持分区域计算
+
+        Parameters:
+        station_info: 站点信息字典
+        formula_config: 公式配置字典
+
+        Returns:
+        new_station_indicators: 包含结果值的字典
+        """
+        # 检查是否需要进行归一化
+        standardize = formula_config.get("standardize", "True").lower() == "true"
+
+        # 检查是否有多个公式配置（分区域）- 使用新的判断逻辑
+        is_multi_region = self._is_multi_region_formula(formula_config)
+
+        if is_multi_region:
+            print("检测到多区域公式配置，按地区分配计算")
+            # 定义南方城市列表
+            south_cities = ['南阳市', '驻马店市', '信阳市']
+
+            # 分离站点到不同区域
+            north_stations = {}
+            south_stations = {}
+
+            for station_id, info in station_info.items():
+                city_name = info.get('city', '')
+
+                # 判断是否属于南方城市
+                if any(south_city in city_name for south_city in south_cities):
+                    south_stations[station_id] = info
+                    # print(f"站点 {station_id}({info.get('station_name', '')}) 属于南方区域")
+                else:
+                    north_stations[station_id] = info
+                    # print(f"站点 {station_id}({info.get('station_name', '')}) 属于北方区域")
+
+            # 计算所有站点的年平均值（南北统一计算）
+            all_annual_means = self._calculate_annual_means()
+
+            # 分别计算不同区域的归一化结果
+            results = {}
+
+            # 计算北方区域
+            if north_stations and 'formula_north' in formula_config:
+                print(f"\n计算北方区域，共 {len(north_stations)} 个站点")
+                north_formula = formula_config['formula_north']
+                north_results = {}
+
+                if standardize:
+                    correlation_config = self.analyze_correlation_from_formula(north_formula)
+                    print(f"北方区域归一化，相关关系: {correlation_config}")
+
+                for station_id in north_stations.keys():
+                    if station_id not in all_annual_means:
+                        continue
+
+                    means = all_annual_means[station_id]
+                    station_results = {}
+
+                    # 计算结果值
+                    if standardize:
+                        # 计算归一化值
+                        for var_name, var_config in north_formula["variables"].items():
+                            indicator_name = var_config["ref"]
+                            mean_value = means.get(indicator_name, np.nan)
+
+                            if not np.isnan(mean_value) and indicator_name in correlation_config:
+                                correlation_type = correlation_config[indicator_name]
+                                normalized_value = self.calculate_membership(
+                                    mean_value, indicator_name, correlation_type
+                                )
+                                station_results[indicator_name] = normalized_value
+                            else:
+                                station_results[indicator_name] = np.nan
+                    else:
+                        # 直接使用年平均值
+                        for var_name, var_config in north_formula["variables"].items():
+                            indicator_name = var_config["ref"]
+                            mean_value = means.get(indicator_name, np.nan)
+                            station_results[indicator_name] = mean_value
+
+                    north_results[station_id] = station_results
+
+                results['north'] = north_results
+
+            # 计算南方区域
+            if south_stations and 'formula_south' in formula_config:
+                print(f"\n计算南方区域，共 {len(south_stations)} 个站点")
+                south_formula = formula_config['formula_south']
+                south_results = {}
+
+                if standardize:
+                    correlation_config = self.analyze_correlation_from_formula(south_formula)
+                    print(f"南方区域归一化，相关关系: {correlation_config}")
+
+                for station_id in south_stations.keys():
+                    if station_id not in all_annual_means:
+                        continue
+
+                    means = all_annual_means[station_id]
+                    station_results = {}
+
+                    # 计算结果值
+                    if standardize:
+                        # 计算归一化值
+                        for var_name, var_config in south_formula["variables"].items():
+                            indicator_name = var_config["ref"]
+                            mean_value = means.get(indicator_name, np.nan)
+
+                            if not np.isnan(mean_value) and indicator_name in correlation_config:
+                                correlation_type = correlation_config[indicator_name]
+                                normalized_value = self.calculate_membership(
+                                    mean_value, indicator_name, correlation_type
+                                )
+                                station_results[indicator_name] = normalized_value
+                            else:
+                                station_results[indicator_name] = np.nan
+                    else:
+                        # 直接使用年平均值
+                        for var_name, var_config in south_formula["variables"].items():
+                            indicator_name = var_config["ref"]
+                            mean_value = means.get(indicator_name, np.nan)
+                            station_results[indicator_name] = mean_value
+
+                    south_results[station_id] = station_results
+
+                results['south'] = south_results
+
+            return results
+
+        else:
+            print("单一公式配置，进行全局计算")
+            # 原有的单一公式处理逻辑
+            standardize = formula_config.get("standardize", "True").lower() == "true"
+
+            # 计算年平均值
+            annual_means = self._calculate_annual_means()
+
+            # 新的station_indicators结构
+            new_station_indicators = {}
+
+            if standardize:
+                # 需要归一化：自动分析相关关系
+                correlation_config = self.analyze_correlation_from_formula(formula_config)
+                print(f"进行归一化计算，相关关系: {correlation_config}")
+            else:
+                print("不进行归一化，直接返回年平均值")
+
+            for station_id, means in annual_means.items():
+                # 初始化新结构
+                new_station_indicators[station_id] = {}
+
+                # 计算结果值
+                if standardize:
+                    # 计算归一化值
+                    for indicator_name in self.indicator_names:
+                        mean_value = means.get(indicator_name, np.nan)
+
+                        if not np.isnan(mean_value) and indicator_name in correlation_config:
+                            correlation_type = correlation_config[indicator_name]
+                            normalized_value = self.calculate_membership(
+                                mean_value, indicator_name, correlation_type
+                            )
+                            new_station_indicators[station_id][indicator_name] = normalized_value
+                        else:
+                            new_station_indicators[station_id][indicator_name] = np.nan
+                else:
+                    # 直接使用年平均值作为结果值
+                    for indicator_name in self.indicator_names:
+                        mean_value = means.get(indicator_name, np.nan)
+                        new_station_indicators[station_id][indicator_name] = mean_value
+
+            return new_station_indicators
 
 
 

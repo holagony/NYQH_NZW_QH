@@ -17,10 +17,63 @@
         "interpolation": {
             "method": "idw"
             }
-        ,
+    },
+    "ZL": {
+        "indicators": {
+            "D50": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "08-31",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": "between",
+                        "value": [50, 100]
+                    }
+                ],
+                "description": "5月-8月10日的暴雨日数"
+            },
+            "D100": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "08-31",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": "between",
+                        "value": [100, 250]
+                    }
+                ],
+                "description": "5月-8月10日的大暴雨日数"
+            },
+            "D250": {
+                "type": "conditional_count",
+                "frequency": "lta",
+                "start_date": "05-20",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "precip",
+                        "operator": ">=",
+                        "value": 250
+                    }
+                ],
+                "description": "5月20日-6月10日特大暴雨日数"
+            }
+        },
+        "interpolation": {
+            "method": "idw"
+        },
         "classification": {
-            "method": "natural_breaks",
-            "num_classes": 5
+            "method": "custom_thresholds",
+            "thresholds": [
+                {"min": 0.8, "level": 1, "label": "极高风险"},
+                {"min": 0.6, "max": 0.8, "level": 2, "label": "高风险"},
+                {"min": 0.4, "max": 0.6, "level": 3, "label": "中风险"},
+                {"max":0.4, "level": 4, "label": "低风险"}  
+            ]
         }
-    }
+    } 
 }

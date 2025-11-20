@@ -6,7 +6,7 @@
   "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
   "areaCode": "410000",
   "areaName": "河南省",
-  "element": "drought",
+  "element": "CJWSD",
   "startDate": "19910101",
   "endDate": "20201231",
   "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
@@ -14,9 +14,9 @@
   "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_410000.tif",
   "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/410000_wgs84.shp",
   "otherFilesPath": "",
-  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought/resultLogFile.json",
-  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought/resultJsonFile.json",
-  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_drought",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_wheat/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_wheat/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_wheat/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_wheat",
   "algorithmConfig": {}
 }

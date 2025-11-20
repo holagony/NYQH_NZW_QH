@@ -1,0 +1,97 @@
+{
+    "CDBHL": {
+        "indicators": {
+            "R": {
+                "type": "period_sum",
+                "start_date": "07-01",
+                "end_date": "07-10",
+                "variable": "precip"
+            },
+            "T1": {
+                "type": "period_mean",
+                "start_date": "07-01",
+                "end_date": "07-10",
+                "variable": "tmin"
+            },
+            "T2": {
+                "type": "period_mean",
+                "start_date": "08-01",
+                "end_date": "09-10",
+                "variable": "tmax"
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "0.016 * R + 0.234 * T1 - 0.017 * T2 + 46.02",
+            "variables": {
+                "R": {"ref": "R"},
+                "T1": {"ref": "T1"},
+                "T2": {"ref": "T2"}
+            }
+        },
+        "interpolation":{
+        "method": "lsm_idw",
+        "order":"before",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability_CDB"
+        }
+        },
+        "classification":{
+        "method": "natural_breaks",
+        "num_classes":4,
+        "thresholds": [
+            {"level": 1, "label": "不适宜区", "max": 0.3},
+            {"level": 2, "label": "次适宜区", "min": 0.3, "max": 0.5},
+            {"level": 3, "label": "适宜区", "min": 0.5, "max": 0.7},
+            {"level": 4, "label": "最适宜区", "min": 0.7}
+            ]
+        }
+    },
+    "CZFHL": {
+        "indicators": {
+            "T1": {
+                "type": "period_mean",
+                "start_date": "06-21",
+                "end_date": "06-30",
+                "variable": "tmin"
+            },
+            "T2": {
+                "type": "period_mean",
+                "start_date": "09-01",
+                "end_date": "09-10",
+                "variable": "tmax"
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "-0.16 * T1 - 0.138 * T2 + 26.1",
+            "variables": {
+                "T1": {"ref": "T1"},
+                "T2": {"ref": "T2"}
+            }
+        },
+        "interpolation":{
+        "method": "lsm_idw",
+        "order":"before",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability_CZF"
+        }
+        },
+        "classification":{
+        "method": "natural_breaks",
+        "num_classes":4,
+        "thresholds": [
+            {"level": 1, "label": "不适宜区", "max": 0.3},
+            {"level": 2, "label": "次适宜区", "min": 0.3, "max": 0.5},
+            {"level": 3, "label": "适宜区", "min": 0.5, "max": 0.7},
+            {"level": 4, "label": "最适宜区", "min": 0.7}
+            ]
+        }
+    }
+}
