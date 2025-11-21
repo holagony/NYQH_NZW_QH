@@ -16,18 +16,23 @@ import os
 from osgeo import gdal
 from scipy.ndimage import sobel
 
+
 def _sat_vapor_pressure(T):
     return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa)，T为气温(°C)
+
 
 def _slope_delta(T):
     es = _sat_vapor_pressure(T)
     return 4098.0 * es / ((T + 237.3)**2)  # 饱和水汽压曲线斜率(kPa/°C)
 
+
 def _pressure_from_elevation(z):
     return 101.3 * ((293.0 - 0.0065 * z) / 293.0)**5.26  # 海拔高度z(m)处的大气压(kPa)
 
+
 def _psychrometric_constant(P):
     return 0.000665 * P  # 湿度常数γ(kPa/°C)
+
 
 def _solar_geometry(lat_rad, day_of_year):
     # 太阳几何与地外辐射：返回Ra(地外辐射)、N(日照时数极限)、ωs(日落时角)
@@ -37,6 +42,7 @@ def _solar_geometry(lat_rad, day_of_year):
     Ra = (24.0 * 60.0 / pi) * 0.0820 * dr * (omega_s * np.sin(lat_rad) * np.sin(delta) + np.cos(lat_rad) * np.cos(delta) * np.sin(omega_s))
     N = 24.0 / pi * omega_s
     return Ra, N, omega_s
+
 
 def penman_et0(daily_data, lat_deg, elev_m, albedo=0.23, as_coeff=0.25, bs_coeff=0.5, k_rs=0.16):
     df = daily_data.copy()
@@ -79,7 +85,11 @@ def penman_et0(daily_data, lat_deg, elev_m, albedo=0.23, as_coeff=0.25, bs_coeff
     et0 = (0.408 * delta * (Rn) + gamma * (900.0 / (tmean + 273.0)) * u2 * (es - ea)) / (delta + gamma * (1.0 + 0.34 * u2))
     return et0.clip(lower=0)
 
+
 def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
+    '''
+    计算内蒙古cwdi,kc使用内蒙古参数
+    '''
     df = daily_data.copy()
     if 'P' not in df.columns and 'precip' in df.columns:
         df = df.rename(columns={'precip': 'P'})
@@ -124,6 +134,7 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     df['CWDI'] = etc_shift.rolling(window=50).apply(_cwdi_window, raw=False)
     return df
 
+
 # 霜冻致灾危险性指标 - 修改为返回Ih和Dv的函数
 def calculate_Ih_Dv(daily_data):
     """
@@ -134,25 +145,25 @@ def calculate_Ih_Dv(daily_data):
     TMIN = df["tmin"]
     condition_spring = ((TMIN.index.month == 5) & (TMIN.index.day >= 16)) | ((TMIN.index.month == 6) & (TMIN.index.day <= 14))
     condition_autumn = ((TMIN.index.month == 8) & (TMIN.index.day >= 27)) | ((TMIN.index.month == 9) & (TMIN.index.day <= 22))
-    
-    frost1 = TMIN[(condition_spring & (TMIN < (-1)) & (TMIN >= (-2))) | (condition_autumn & (TMIN >= 0) & (TMIN < 0.5))]  # 轻霜冻 
+
+    frost1 = TMIN[(condition_spring & (TMIN < (-1)) & (TMIN >= (-2))) | (condition_autumn & (TMIN >= 0) & (TMIN < 0.5))]  # 轻霜冻
     frost2 = TMIN[(condition_spring & (TMIN < (-2)) & (TMIN >= (-3))) | (condition_autumn & (TMIN >= (-1)) & (TMIN < 0))]  # 中霜冻
     frost3 = TMIN[(condition_spring & (TMIN < (-3)) & (TMIN >= (-4.5))) | (condition_autumn & (TMIN >= (-2.5)) & (TMIN < (-1)))]  # 重霜冻
-    
+
     # 年数、日最低气温中间值
     years = len(TMIN.index.year.unique())
     frost1_median = frost1.sort_values().median()
     frost2_median = frost2.sort_values().median()
     frost3_median = frost3.sort_values().median()
-    
+
     # 统计霜冻频次
     frost1_num = len(frost1)
     frost2_num = len(frost2)
     frost3_num = len(frost3)
-    
+
     # 计算Ih霜冻灾害强度频率指标
     Ih = (frost1_num * frost1_median + frost2_num * frost2_median + frost3_num * frost3_median) / years
-    
+
     # 霜冻发生日期变异系数Dv
     frost = pd.concat([frost1, frost2, frost3])
     if len(frost) > 0:
@@ -162,8 +173,9 @@ def calculate_Ih_Dv(daily_data):
         Dv = std_dev / mean_value if mean_value != 0 else 0
     else:
         Dv = 0
-    
+
     return Ih, Dv
+
 
 def normalize_values(values: List[float]) -> List[float]:
     """
@@ -171,18 +183,18 @@ def normalize_values(values: List[float]) -> List[float]:
     """
     if not values:
         return []
-    
+
     valid_values = [v for v in values if v is not None and not np.isnan(v)]
     if not valid_values:
         return [0.0] * len(values)
-    
+
     min_val = min(valid_values)
     max_val = max(valid_values)
-    
+
     # 如果所有值都相同，归一化到0.5
     if max_val == min_val:
         return [0.5 if v is not None and not np.isnan(v) else 0.0 for v in values]
-    
+
     normalized = []
     for v in values:
         if v is None or np.isnan(v):
@@ -190,8 +202,9 @@ def normalize_values(values: List[float]) -> List[float]:
         else:
             norm_val = (v - min_val) / (max_val - min_val)
             normalized.append(norm_val)
-    
+
     return normalized
+
 
 def normalize_array(array: np.ndarray) -> np.ndarray:
     """
@@ -199,17 +212,17 @@ def normalize_array(array: np.ndarray) -> np.ndarray:
     """
     if array.size == 0:
         return array
-    
+
     # 创建一个掩码来标识非NaN值
     mask = ~np.isnan(array)
-    
+
     if not np.any(mask):
         return np.zeros_like(array)
-    
+
     valid_values = array[mask]
     min_val = np.min(valid_values)
     max_val = np.max(valid_values)
-    
+
     # 如果所有有效值都相同，归一化到0.5
     if max_val == min_val:
         normalized_array = np.full_like(array, 0.5, dtype=float)
@@ -217,18 +230,35 @@ def normalize_array(array: np.ndarray) -> np.ndarray:
     else:
         normalized_array = (array - min_val) / (max_val - min_val)
         normalized_array[~mask] = np.nan
-    
+
     return normalized_array
+
 
 class SPSO_ZH:
     '''
     内蒙古-大豆-灾害区划
     干旱和霜冻
-    干旱--目前是生成危险性G的tif，其他风险区划的样例数据暂未提供
-    霜冻 TODO
     '''
 
-    def drought_station_g(self, data, config):
+    def _align_and_read_input(self, grid_path, target_path, result_path):
+        '''
+        将单个外部栅格对齐到grid_path，并读取为数组
+        target_path: 要对齐的目标栅格路径
+        result_path: 对齐后的临时文件存储路径
+        返回: 对齐后的numpy数组（NoData已置为NaN）
+        '''
+        temp_path = os.path.join(result_path, 'intermediate', 'align_temp.tif')
+        aligned_path = LSMIDWInterpolation()._align_datasets(grid_path, target_path, temp_path)
+        ds = gdal.Open(aligned_path)
+        band = ds.GetRasterBand(1)
+        arr = band.ReadAsArray()
+        nodata = band.GetNoDataValue()
+        arr = np.where(arr == nodata, np.nan, arr)
+        ds = None
+        os.remove(aligned_path)
+        return arr
+
+    def _calc_drought_station_g(self, data, config):
         '''
         计算每个站点的干旱风险性G
         '''
@@ -263,9 +293,9 @@ class SPSO_ZH:
         w_heavy = heavy / n
         return float(0.15 * w_light + 0.35 * w_medium + 0.5 * w_heavy)
 
-    def calculate_drought(self, params):
+    def calculate_drought_result(self, params):
         '''
-        干旱区划
+        计算最终的干旱区划
         '''
         station_coords = params.get('station_coords', {})
         algorithm_config = params.get('algorithmConfig', {})
@@ -285,12 +315,14 @@ class SPSO_ZH:
         end_date = cfg.get('endDate')
         station_values: Dict[str, float] = {}
 
+        # 逐站点获取数据 + 计算危险性G
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
-            g = self.drought_station_g(daily, cwdi_config)
+            g = self._calc_drought_station_g(daily, cwdi_config)  # 站点的干旱风险指数G
             station_values[sid] = float(g) if np.isfinite(g) else np.nan
 
-        interp_conf = algorithm_config.get('interpolation', {})
+        # 危险性G插值
+        interp_conf = algorithm_config.get('interpolation')
         method = str(interp_conf.get('method', 'idw')).lower()
         iparams = interp_conf.get('params', {})
 
@@ -306,7 +338,7 @@ class SPSO_ZH:
             'shp_path': cfg.get('shpFilePath')
         }
 
-        if method == 'lsm_idw':
+        if method == 'lsm_idw':  # 生成tif
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
@@ -315,6 +347,24 @@ class SPSO_ZH:
         data_min = float(np.nanmin(result['data']))
         data_max = float(np.nanmax(result['data']))
         print(f"干旱指数数值范围: {data_min:.4f} ~ {data_max:.4f}")
+
+        # 读取其他静态数据，结合危险性G，计算干旱风险
+        czt_path = cfg.get('cztFilePath')
+        yzhj_path = cfg.get('yzhjFilePath')
+        fzjz_path = cfg.get('fzjzFilePath')
+        grid_path = interp_data['grid_path']
+        czt_array = self._align_and_read_input(grid_path, czt_path, cfg.get('resultPath'))
+        yzhj_array = self._align_and_read_input(grid_path, yzhj_path, cfg.get('resultPath'))
+        fzjz_array = self._align_and_read_input(grid_path, fzjz_path, cfg.get('resultPath'))
+
+        risk = result['data'].astype(np.float32) * 0.7 + \
+               yzhj_array.astype(np.float32) * 0.1 + \
+               czt_array.astype(np.float32) * 0.1 + \
+               (1.0 - fzjz_array.astype(np.float32)) * 0.1
+
+        risk_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险指数.tif")
+        self._save_geotiff(risk, result['meta'], risk_tif_path, 0)  # 保存干旱综合风险指数
+        result['data'] = risk
 
         # 分级
         class_conf = algorithm_config.get('classification', {})
@@ -352,12 +402,12 @@ class SPSO_ZH:
         station_ids = [sid for sid in station_ids if sid in available]
         start_date = cfg.get('startDate')
         end_date = cfg.get('endDate')
-        
+
         # 第一步：收集所有站点的Ih和Dv值
         station_ih_values = []
         station_dv_values = []
         station_data_map = {}  # 存储站点数据以便后续使用
-        
+
         print("收集所有站点的Ih和Dv值...")
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
@@ -366,11 +416,11 @@ class SPSO_ZH:
             station_ih_values.append(Ih)
             station_dv_values.append(Dv)
             print(f"站点 {sid}: Ih={Ih:.4f}, Dv={Dv:.4f}")
-        
+
         # 第二步：对所有站点的Ih和Dv进行归一化
         normalized_ih = normalize_values(station_ih_values)
         normalized_dv = normalize_values(station_dv_values)
-        
+
         # 输出归一化前后的统计信息
         if station_ih_values and station_dv_values:
             valid_ih = [v for v in station_ih_values if v is not None and not np.isnan(v)]
@@ -380,7 +430,7 @@ class SPSO_ZH:
                 print(f"Dv原始范围: {min(valid_dv):.4f} ~ {max(valid_dv):.4f}")
                 print(f"Ih归一化范围: {min(normalized_ih):.4f} ~ {max(normalized_ih):.4f}")
                 print(f"Dv归一化范围: {min(normalized_dv):.4f} ~ {max(normalized_dv):.4f}")
-        
+
         # 第三步：使用归一化后的Ih和Dv计算每个站点的W值
         station_values: Dict[str, float] = {}
         for i, sid in enumerate(station_ids):
@@ -390,7 +440,7 @@ class SPSO_ZH:
             W = 0.75 * Ih_norm + 0.25 * Dv_norm
             station_values[sid] = float(W) if np.isfinite(W) else np.nan
             print(f"站点 {sid}: Ih_norm={Ih_norm:.4f}, Dv_norm={Dv_norm:.4f}, W={W:.4f}")
-        
+
         # 第四步：插值计算
         interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
@@ -412,46 +462,46 @@ class SPSO_ZH:
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
-            
-        W_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "致灾危险性指数.tif")   
+
+        W_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "致灾危险性指数.tif")
         self._save_geotiff(result['data'], result['meta'], W_tif_path, 0)  # 保存致灾危险性指数tif
-        
-        interpolated_W_value = result["data"]     
-        
+
+        interpolated_W_value = result["data"]
+
         # 计算敏感性指数
         M_value = self.M(params)
-        M_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "孕灾环境敏感性指数.tif") 
+        M_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "孕灾环境敏感性指数.tif")
         self._save_geotiff(M_value, result['meta'], M_tif_path, 0)  # 保存孕灾环境敏感性指数tif
-        
+
         # 霜冻承灾体暴露度指数C，承载体脆弱性指标(大豆种植面积比例栅格数据)
         ZZ_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/内蒙古承载体脆弱性c.tif"
         ZZ_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/ZZ_temp.tif"
-        ZZ_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], ZZ_percent_path, ZZ_temp_path) 
+        ZZ_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], ZZ_percent_path, ZZ_temp_path)
         in_ds_C = gdal.Open(ZZ_temp_path)
         C_array = in_ds_C.GetRasterBand(1).ReadAsArray()  # 读取波段数据
         Nodata = in_ds_C.GetRasterBand(1).GetNoDataValue()
         C_array = np.where(C_array == Nodata, np.nan, C_array)
-        
+
         # 霜冻防灾减灾能力指数F(灌溉面积百分比)
         GG_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/内蒙古防灾减灾能力c.tif"
         GG_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/GG_temp.tif"
-        GG_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], GG_percent_path, GG_temp_path) 
+        GG_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], GG_percent_path, GG_temp_path)
         in_ds_F = gdal.Open(GG_temp_path)
         F_array = in_ds_F.GetRasterBand(1).ReadAsArray()  # 读取波段数据
         Nodata = in_ds_F.GetRasterBand(1).GetNoDataValue()
-        F_array = np.where(F_array == Nodata, 0, F_array)        
-        
+        F_array = np.where(F_array == Nodata, 0, F_array)
+
         # FRI计算
         FRI = interpolated_W_value * 0.593 + C_array * 0.255 + M_value * 0.106 + F_array * 0.046
 
         # 分级
         class_conf = algorithm_config.get('classification', {})
         key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
-        classificator = params.get('algorithms', {})[key]    
+        classificator = params.get('algorithms', {})[key]
         # 执行
-        classdata = classificator.execute(FRI, class_conf) 
+        classdata = classificator.execute(FRI, class_conf)
         os.remove(ZZ_temp_path)
-        os.remove(GG_temp_path)                
+        os.remove(GG_temp_path)
         return {
             'data': classdata,
             'meta': {
@@ -463,19 +513,19 @@ class SPSO_ZH:
             'type': '内蒙古大豆霜冻'
         }
 
-    def M(self, params):        
+    def M(self, params):
         # 环境敏感性指数
         config = params['config']
         dem_path = config.get("demFilePath", "")
         grid_path = config.get("gridFilePath", "")
         temp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp.tif')
-        aligned_dem = LSMIDWInterpolation()._align_datasets(grid_path, dem_path, temp_path)  
+        aligned_dem = LSMIDWInterpolation()._align_datasets(grid_path, dem_path, temp_path)
         in_ds_dem = gdal.Open(aligned_dem)
         gtt = in_ds_dem.GetGeoTransform()
         alti_array = in_ds_dem.GetRasterBand(1).ReadAsArray()  # 读取波段数据
         Nodata = in_ds_dem.GetRasterBand(1).GetNoDataValue()
         # 海拔
-        alti_array = np.where(alti_array == Nodata, np.nan, alti_array)  
+        alti_array = np.where(alti_array == Nodata, np.nan, alti_array)
         # 求纬度
         width = in_ds_dem.RasterXSize  # cols
         height = in_ds_dem.RasterYSize  # rows
@@ -486,38 +536,38 @@ class SPSO_ZH:
         # 使用Sobel算子计算水平和垂直方向的梯度
         dz_dx = sobel(alti_array, axis=1) / (gtt[1] * 111320 * np.cos(np.radians(lat)))
         dz_dy = sobel(alti_array, axis=0) / (gtt[1] * 111320 * np.cos(np.radians(lat)))
-        aspect = np.arctan2(dz_dy, dz_dx) 
-        aspect = np.where(alti_array == Nodata, np.nan, aspect)         
+        aspect = np.arctan2(dz_dy, dz_dx)
+        aspect = np.where(alti_array == Nodata, np.nan, aspect)
         # 赋值
         alti_array_ = np.zeros_like(alti_array)
         alti_array_ = np.where(alti_array < 200, 1, alti_array_)
         alti_array_ = np.where((alti_array >= 200) & (alti_array < 400), 2, alti_array_)
         alti_array_ = np.where((alti_array >= 400) & (alti_array < 600), 3, alti_array_)
-        alti_array_ = np.where((alti_array >= 600) & (alti_array < 800), 4, alti_array_)     
+        alti_array_ = np.where((alti_array >= 600) & (alti_array < 800), 4, alti_array_)
         alti_array_ = np.where(alti_array >= 800, 5, alti_array_)
         alti_array_ = np.where(alti_array == Nodata, np.nan, alti_array_)
-        
+
         aspect_ = np.zeros_like(aspect)
         aspect_ = np.where((aspect > 45) & (aspect <= 135), 1, aspect_)
         aspect_ = np.where((aspect >= 135) & (aspect < 225), 2, aspect_)
         aspect_ = np.where((aspect >= 225) & (aspect < 315), 3, aspect_)
-        aspect_ = np.where((aspect >= 315) & (aspect <= 360), 4, aspect_)     
+        aspect_ = np.where((aspect >= 315) & (aspect <= 360), 4, aspect_)
         aspect_ = np.where(aspect <= 45, 5, aspect_)
         aspect_ = np.where(aspect == Nodata, np.nan, aspect_)
-        
+
         # 对alti_array_和aspect_进行归一化处理
         alti_array_norm = normalize_array(alti_array_)
         aspect_norm = normalize_array(aspect_)
-        
+
         # 输出归一化前后的统计信息
         print(f"海拔等级原始范围: {np.nanmin(alti_array_):.1f} ~ {np.nanmax(alti_array_):.1f}")
         print(f"坡向等级原始范围: {np.nanmin(aspect_):.1f} ~ {np.nanmax(aspect_):.1f}")
         print(f"海拔等级归一化范围: {np.nanmin(alti_array_norm):.4f} ~ {np.nanmax(alti_array_norm):.4f}")
         print(f"坡向等级归一化范围: {np.nanmin(aspect_norm):.4f} ~ {np.nanmax(aspect_norm):.4f}")
-        
+
         # 使用归一化后的值计算M_value
         M_value = 0.833 * alti_array_norm + 0.167 * aspect_norm
-        
+
         os.remove(aligned_dem)
         return M_value
 
@@ -542,27 +592,20 @@ class SPSO_ZH:
             datatype = gdal.GDT_Float64
         else:
             datatype = gdal.GDT_Float32  # 默认情况
-        
+
         driver = gdal.GetDriverByName('GTiff')
-        dataset = driver.Create(
-            output_path,
-            meta['width'],
-            meta['height'],
-            1,
-            datatype,
-            ['COMPRESS=LZW']
-        )
-        
+        dataset = driver.Create(output_path, meta['width'], meta['height'], 1, datatype, ['COMPRESS=LZW'])
+
         dataset.SetGeoTransform(meta['transform'])
         dataset.SetProjection(meta['crs'])
-        
+
         band = dataset.GetRasterBand(1)
         band.WriteArray(data)
         band.SetNoDataValue(nodata)
-        
+
         band.FlushCache()
-        dataset = None                      
-        
+        dataset = None
+
     def calculate(self, params):
         config = params['config']
         disaster_type = config['element']

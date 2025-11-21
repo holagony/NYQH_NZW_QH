@@ -15,22 +15,22 @@
             "aggregation": "mean"
         },
         "interpolation": {
-            "method": "idw",
+            "method": "lsm_idw",
             "params": {
-                "radius_dist": 2.0,
+                "block_size": 256,
+                "radius_dist": 5.0,
                 "min_num": 10,
-                "first_size": 200,
-                "fill_nans": true
+                "first_size": 100,
+                "nodata": 0
             }
         },
         "classification": {
             "method": "natural_breaks",
-            "num_classes": 5
+            "num_classes": 4
         }
     },
     "SD": {
-        "indicators": {
-        },
+        "indicators": {},
         "W": {
             "start_date": "01-01",
             "end_date": "12-31"
@@ -42,17 +42,37 @@
                 "radius_dist": 5.0,
                 "min_num": 10,
                 "first_size": 100,
-                "nodata":0
+                "nodata": 0
             }
         },
         "classification": {
             "method": "natural_breaks",
             "num_classes": 4,
             "thresholds": [
-            {"min": "","max": 0.45, "level": 4, "label": "低风险"},    
-            {"min": 0.45, "max": 0.55, "level": 3, "label": "中风险"},  
-            {"min": 0.55, "max": 0.65, "level": 2, "label": "高风险"},  
-            {"min": 0.65, "max": "","level": 1, "label": "极高风险"}   
+                {
+                    "min": "",
+                    "max": 0.45,
+                    "level": 4,
+                    "label": "低风险"
+                },
+                {
+                    "min": 0.45,
+                    "max": 0.55,
+                    "level": 3,
+                    "label": "中风险"
+                },
+                {
+                    "min": 0.55,
+                    "max": 0.65,
+                    "level": 2,
+                    "label": "高风险"
+                },
+                {
+                    "min": 0.65,
+                    "max": "",
+                    "level": 1,
+                    "label": "极高风险"
+                }
             ]
         }
     }
