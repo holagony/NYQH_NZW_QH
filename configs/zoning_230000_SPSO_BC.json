@@ -74,7 +74,7 @@
             }
         },
         "interpolation": {
-            "order": "after",
+            "order": "before",
             "method": "lsm_idw",
             "params": {
                 "radius_dist": 5.0,

@@ -49,7 +49,7 @@
         },
         "interpolation": {
             "order": "before",
-            "method": "lsm_idw",
+            "method": "krige",
             "params": {
                 "block_size": 256,
                 "radius_dist": 5.0,
