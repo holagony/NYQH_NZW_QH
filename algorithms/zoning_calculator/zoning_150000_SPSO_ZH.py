@@ -342,6 +342,11 @@ class SPSO_ZH:
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
+        
+        # 负数设置为0 + tiff保存
+        result['data'] = np.maximum(result['data'], 0)
+        g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱危险性指数.tif")
+        self._save_geotiff(result['data'], result['meta'], g_tif_path, 0)
 
         # 输出result的数值范围
         data_min = float(np.nanmin(result['data']))
