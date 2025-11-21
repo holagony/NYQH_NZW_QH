@@ -293,7 +293,7 @@ class SPSO_ZH:
         w_heavy = heavy / n
         return float(0.15 * w_light + 0.35 * w_medium + 0.5 * w_heavy)
 
-    def calculate_drought_result(self, params):
+    def calculate_drought(self, params):
         '''
         计算最终的干旱区划
         '''
