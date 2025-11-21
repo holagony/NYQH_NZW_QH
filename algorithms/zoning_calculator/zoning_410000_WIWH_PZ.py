@@ -95,6 +95,19 @@ class WIWH_PZ:
         indicator_configs = crop_config.get("indicators", {})
         interpolated_indicators = {}
 
+        # 获取公式配置
+        formula_config = crop_config.get("formula", {})
+        if not formula_config:
+            raise ValueError("未找到公式配置")
+
+        indicator_names = list(crop_config.get("indicators", {}).keys())
+
+        # 创建计算器（自动计算数据范围）
+        calculator = StandardizationCalculator(station_indicators, indicator_names)
+
+        # 计算所有站点的隶属度
+        new_station_indicators = calculator.calculate_all_stations_normalization(formula_config)
+
         for indicator_name in indicator_configs.keys():
             print(f"正在插值指标: {indicator_name}")
 
@@ -102,7 +115,7 @@ class WIWH_PZ:
             indicator_values = {}
             valid_count = 0
 
-            for station_id, values in station_indicators.items():
+            for station_id, values in new_station_indicators.items():
                 if isinstance(values, dict) and indicator_name in values:
                     value = values[indicator_name]
                 else:
@@ -114,7 +127,7 @@ class WIWH_PZ:
                 else:
                     indicator_values[station_id] = np.nan
 
-            print(f"指标 {indicator_name} 的有效站点数: {valid_count}/{len(station_indicators)}")
+            print(f"指标 {indicator_name} 的有效站点数: {valid_count}/{len(new_station_indicators)}")
 
             if valid_count == 0:
                 print(f"警告: 指标 {indicator_name} 没有有效数据，跳过插值")
@@ -178,7 +191,7 @@ class WIWH_PZ:
 
         # 计算所有站点的隶属度
         new_station_indicators = calculator.calculate_all_stations_normalization(formula_config)
-        print(new_station_indicators)
+
         for station_id, station_values in new_station_indicators.items():
             try:
                 station_values_normalized = station_values
@@ -329,12 +342,15 @@ class WIWH_PZ:
 
         # 计算公式
         try:
+
             # 替换公式中的变量名
             local_formula = formula_str
             for var_name, var_value in station_data.items():
                 if isinstance(var_value, (int, float)) and not np.isnan(var_value):
+                    print(f"  {var_name}: {var_value:.4f}")
                     local_formula = local_formula.replace(var_name, str(var_value))
                 else:
+                    print(f"  {var_name}: NaN 或无效值")
                     local_formula = local_formula.replace(var_name, "np.nan")
 
             # 安全计算
@@ -895,7 +911,20 @@ class StandardizationCalculator:
             # valid_count = sum(1 for value in new_station_indicators[station_id].values()
             #                   if not np.isnan(value))
             # print(f"站点 {station_id} 完成，有效结果指标: {valid_count}/{len(self.indicator_names)}")
+            # 在函数末尾添加：
+        if standardize:
+            print(f"\n=== 各特征归一化统计 ===")
+            for indicator_name in self.indicator_names:
+                feature_values = []
+                for station_data in new_station_indicators.values():
+                    value = station_data.get(indicator_name, np.nan)
+                    if not np.isnan(value):
+                        feature_values.append(value)
 
+                if feature_values:
+                    values_array = np.array(feature_values)
+                    print(
+                        f"{indicator_name}: [{np.min(values_array):.4f}, {np.max(values_array):.4f}], 均值: {np.mean(values_array):.4f}")
         return new_station_indicators
 
 

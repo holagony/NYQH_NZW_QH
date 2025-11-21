@@ -15,8 +15,9 @@
             "aggregation": "mean"
         },
         "interpolation": {
-            "method": "idw"
-            }
+            "order": "after",
+            "method": "lsm_idw"
+        }
     },
     "ZL": {
         "indicators": {

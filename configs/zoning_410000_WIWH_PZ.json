@@ -48,8 +48,16 @@
             }
         },
         "interpolation": {
-            "order": "after",
-            "method": "lsm_idw"
+            "order": "before",
+            "method": "lsm_idw",
+            "params": {
+                "block_size": 256,
+                "radius_dist": 5.0,
+                "min_num": 10,
+                "first_size": 100,
+                "nodata":0
+            }
+
         },
         "classification": {
             "method": "custom_thresholds",
@@ -125,7 +133,7 @@
             }
         },
         "interpolation": {
-            "order": "after",
+            "order": "before",
             "method": "lsm_idw"
         },
         "classification": {
@@ -159,7 +167,7 @@
             }
         },
         "interpolation": {
-            "order": "after",
+            "order": "before",
             "method": "lsm_idw"
         },
         "classification": {
@@ -225,7 +233,7 @@
             }
         },
         "interpolation": {
-            "order": "after",
+            "order": "before",
             "method": "lsm_idw"
         },
         "classification": {

@@ -100,34 +100,117 @@ class IndicatorCalculator:
             else:
                 return np.nan
         
+    # def _calculate_period_mean(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
+    #     """优化的时间段平均值计算 - 支持多种频率输出"""
+    #     start_date_str = config["start_date"]
+    #     end_date_str = config["end_date"]
+    #     variable = config["variable"]
+    #     year_offset = config.get("year_offset", 0)
+    #
+    #     if data.empty:
+    #         return np.nan if frequency == "lta" else {}
+    #
+    #     # 创建年份掩码的向量化方法
+    #     def create_year_mask(data_index, start_date_str, end_date_str, year_offset):
+    #         """为整个时间序列创建年份掩码"""
+    #         # 获取所有年份
+    #         years = data_index.year.unique()
+    #
+    #         # 为每个年份创建时间段掩码
+    #         all_masks = []
+    #         year_info = []
+    #         for year in years:
+    #             start_date = pd.to_datetime(f"{year}-{start_date_str}")
+    #             end_year = year + year_offset
+    #             end_date = pd.to_datetime(f"{end_year}-{end_date_str}")
+    #
+    #             year_mask = (data_index >= start_date) & (data_index <= end_date)
+    #             all_masks.append(year_mask)
+    #             year_info.append(year)
+    #
+    #         # 合并所有年份的掩码
+    #         if all_masks:
+    #             combined_mask = all_masks[0]
+    #             for mask in all_masks[1:]:
+    #                 combined_mask = combined_mask | mask
+    #             return combined_mask, year_info
+    #         else:
+    #             return pd.Series(False, index=data_index), []
+    #
+    #     # 创建时间段掩码
+    #     period_mask, years = create_year_mask(data.index, start_date_str, end_date_str, year_offset)
+    #
+    #     if not period_mask.any():
+    #         return np.nan if frequency == "lta" else {}
+    #
+    #     # 使用掩码一次性计算所有年份的平均值
+    #     period_data = data.loc[period_mask, variable]
+    #
+    #     if period_data.empty:
+    #         return np.nan if frequency == "lta" else {}
+    #
+    #     # 按年份分组计算每年平均值
+    #     yearly_means = period_data.groupby(period_data.index.year).mean()
+    #
+    #     if frequency == "yearly":
+    #         # 返回逐年数据
+    #         return yearly_means.to_dict()
+    #     else:
+    #         # 返回多年平均
+    #         return float(yearly_means.mean()) if not yearly_means.empty else np.nan
+    # 创建年份掩码的向量化方法
+
     def _calculate_period_mean(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
-        """优化的时间段平均值计算 - 支持多种频率输出"""
+        """优化的时间段平均值计算 - 支持多种频率输出+上一年/当前年/去年的指标"""
         start_date_str = config["start_date"]
         end_date_str = config["end_date"]
         variable = config["variable"]
         year_offset = config.get("year_offset", 0)
-        
+
         if data.empty:
             return np.nan if frequency == "lta" else {}
-        
-        # 创建年份掩码的向量化方法
+
         def create_year_mask(data_index, start_date_str, end_date_str, year_offset):
-            """为整个时间序列创建年份掩码"""
+            """为整个时间序列创建年份掩码 - 支持多种时间模式"""
             # 获取所有年份
             years = data_index.year.unique()
-            
+
             # 为每个年份创建时间段掩码
             all_masks = []
             year_info = []
-            for year in years:
-                start_date = pd.to_datetime(f"{year}-{start_date_str}")
-                end_year = year + year_offset
+
+            for base_year in years:
+                # 根据year_offset的值确定计算模式
+                if year_offset == -1:
+                    # 上一年模式：计算base_year-1年的数据
+                    start_year = base_year - 1
+                    end_year = base_year - 1
+                elif year_offset == 0:
+                    # 当前年模式：计算base_year年的数据
+                    start_year = base_year
+                    end_year = base_year
+                elif year_offset >= 1:
+                    # 跨年模式：从base_year年开始，到base_year+year_offset年结束
+                    # year_offset=1: 跨1年，year_offset=2: 跨2年，以此类推
+                    start_year = base_year
+                    end_year = base_year + year_offset
+                else:
+                    # 其他负偏移值（如-2, -3等）：计算前多年的数据
+                    start_year = base_year + year_offset  # year_offset为负值
+                    end_year = base_year - 1  # 到前一年结束
+
+                # 检查年份是否在数据范围内
+                if start_year < data_index.year.min() or end_year > data_index.year.max():
+                    # 跳过超出数据范围的年份
+                    continue
+
+                start_date = pd.to_datetime(f"{start_year}-{start_date_str}")
                 end_date = pd.to_datetime(f"{end_year}-{end_date_str}")
-                
+
                 year_mask = (data_index >= start_date) & (data_index <= end_date)
                 all_masks.append(year_mask)
-                year_info.append(year)
-            
+                year_info.append(base_year)  # 始终使用base_year作为标识
+
             # 合并所有年份的掩码
             if all_masks:
                 combined_mask = all_masks[0]
@@ -136,29 +219,29 @@ class IndicatorCalculator:
                 return combined_mask, year_info
             else:
                 return pd.Series(False, index=data_index), []
-        
+
         # 创建时间段掩码
         period_mask, years = create_year_mask(data.index, start_date_str, end_date_str, year_offset)
-        
+
         if not period_mask.any():
             return np.nan if frequency == "lta" else {}
-        
+
         # 使用掩码一次性计算所有年份的平均值
         period_data = data.loc[period_mask, variable]
-        
+
         if period_data.empty:
             return np.nan if frequency == "lta" else {}
-        
+
         # 按年份分组计算每年平均值
         yearly_means = period_data.groupby(period_data.index.year).mean()
-        
+
         if frequency == "yearly":
             # 返回逐年数据
             return yearly_means.to_dict()
         else:
             # 返回多年平均
             return float(yearly_means.mean()) if not yearly_means.empty else np.nan
-    
+
     def _calculate_period_sum(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
         """优化的时间段累计值计算 - 支持多种频率输出"""
         start_date_str = config["start_date"]

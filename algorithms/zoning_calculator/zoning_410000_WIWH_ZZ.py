@@ -5,8 +5,8 @@ import pandas as pd
 from typing import Dict, Any, Union, List
 from osgeo import gdal
 
-class GenericZoningCalculator:
-    """通用区划计算器 - 支持完全参数化配置"""
+class WIWH_ZZ:
+    """根据通用区划计算器修改"""
 
     def __init__(self):
         pass
