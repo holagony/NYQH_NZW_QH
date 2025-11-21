@@ -15,14 +15,7 @@
             "aggregation": "mean"
         },
         "interpolation": {
-            "method": "lsm_idw",
-            "params": {
-                "block_size": 256,
-                "radius_dist": 5.0,
-                "min_num": 10,
-                "first_size": 100,
-                "nodata": 0
-            }
+            "method": "lsm_idw"
         },
         "classification": {
             "method": "natural_breaks",

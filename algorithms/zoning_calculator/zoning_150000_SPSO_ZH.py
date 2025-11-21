@@ -253,6 +253,7 @@ class SPSO_ZH:
         band = ds.GetRasterBand(1)
         arr = band.ReadAsArray()
         nodata = band.GetNoDataValue()
+        # arr = np.where(arr == nodata, 0, arr) # 设置为0，而不是np.nan
         arr = np.where(arr == nodata, np.nan, arr)
         ds = None
         os.remove(aligned_path)
@@ -304,6 +305,7 @@ class SPSO_ZH:
         data_dir = cfg.get('inputFilePath')
         station_file = cfg.get('stationFilePath')
 
+        # 加载数据管理器
         dm = DataManager(data_dir, station_file, multiprocess=False, num_processes=1)
         station_ids = list(station_coords.keys())
         if not station_ids:
@@ -320,6 +322,13 @@ class SPSO_ZH:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self._calc_drought_station_g(daily, cwdi_config)  # 站点的干旱风险指数G
             station_values[sid] = float(g) if np.isfinite(g) else np.nan
+
+        # 输出插值前站点数值范围
+        vals = [v for v in station_values.values() if not np.isnan(v)]
+        if vals:
+            data_min = float(np.min(vals))
+            data_max = float(np.max(vals))
+            print(f"插值前站点数值范围: {data_min:.4f} ~ {data_max:.4f}")
 
         # 危险性G插值
         interp_conf = algorithm_config.get('interpolation')
@@ -343,15 +352,12 @@ class SPSO_ZH:
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
         
-        # 负数设置为0 + tiff保存
-        result['data'] = np.maximum(result['data'], 0)
+        # 数值设置 + tiff保存
+        # result['data'] = np.maximum(result['data'], 0)
+        # result['data'] = np.where(np.isnan(result['data']), 0, result['data'])  # 将NaN也设为0
+        result['data'] = normalize_array(result['data']) # 归一化
         g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱危险性指数.tif")
         self._save_geotiff(result['data'], result['meta'], g_tif_path, 0)
-
-        # 输出result的数值范围
-        data_min = float(np.nanmin(result['data']))
-        data_max = float(np.nanmax(result['data']))
-        print(f"干旱指数数值范围: {data_min:.4f} ~ {data_max:.4f}")
 
         # 读取其他静态数据，结合危险性G，计算干旱风险
         czt_path = cfg.get('cztFilePath')
