@@ -9,6 +9,8 @@ from pathlib import Path
 import importlib
 import ast
 import datetime
+import os
+
 
 def _sat_vapor_pressure(T):
     return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa)，T为气温(°C)
@@ -121,6 +123,7 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     df['CWDI'] = etc_shift.rolling(window=50).apply(_cwdi_window, raw=False)
     return df
 
+
 def pre_category(x):
     """降雨量赋值标准"""
     if x < 80:
@@ -133,7 +136,8 @@ def pre_category(x):
         return 3
     else:
         return np.nan
-    
+
+
 def pre_days_category(x):
     """降雨量赋值标准"""
     if x < 8:
@@ -146,7 +150,8 @@ def pre_days_category(x):
         return 3
     else:
         return np.nan
-      
+
+
 def ssh_category(x):
     """日照时赋值标准"""
     if x > 120:
@@ -160,6 +165,7 @@ def ssh_category(x):
     else:
         return np.nan
 
+
 def index(x):
     "年度指数划分"
     if x <= 2:
@@ -172,7 +178,8 @@ def index(x):
         return 3
     else:
         return np.nan
-        
+
+
 def calculate_tmin0(daily_data):
     """
     ≤0℃
@@ -182,23 +189,18 @@ def calculate_tmin0(daily_data):
     TMIN = df["tmin"]
     #统计4月1日到4月30日日最低气温小于0℃的天数
     april_cold_days_by_year = {}
-    
+
     # 获取所有年份
     all_years = TMIN.index.year.unique()
-    
+
     for year in all_years:
         # 筛选该年4月1日到4月30日的数据
-        april_data = TMIN[
-            (TMIN.index.year == year) & 
-            (TMIN.index.month == 4) & 
-            (TMIN.index.day >= 1) & 
-            (TMIN.index.day <= 30)
-        ]
-        
+        april_data = TMIN[(TMIN.index.year == year) & (TMIN.index.month == 4) & (TMIN.index.day >= 1) & (TMIN.index.day <= 30)]
+
         # 统计日最低气温小于0℃的天数
         cold_days_count = len(april_data[april_data < 0])
         april_cold_days_by_year[year] = cold_days_count
-    
+
     # 计算统计值
     if april_cold_days_by_year:
         cold_days_values = list(april_cold_days_by_year.values())
@@ -209,10 +211,8 @@ def calculate_tmin0(daily_data):
         mean_cold_days = 0
         max_cold_days = 0
         min_cold_days = 0
-    
-    
-    return mean_cold_days, cold_days_values
 
+    return mean_cold_days, cold_days_values
 
 
 def calculate_tmin1(daily_data):
@@ -224,23 +224,18 @@ def calculate_tmin1(daily_data):
     TMIN = df["tmin"]
     #统计4月1日到4月30日日最低气温小于0℃的天数
     april_cold_days_by_year = {}
-    
+
     # 获取所有年份
     all_years = TMIN.index.year.unique()
-    
+
     for year in all_years:
         # 筛选该年4月1日到4月30日的数据
-        april_data = TMIN[
-            (TMIN.index.year == year) & 
-            (TMIN.index.month == 4) & 
-            (TMIN.index.day >= 1) & 
-            (TMIN.index.day <= 30)
-        ]
-        
+        april_data = TMIN[(TMIN.index.year == year) & (TMIN.index.month == 4) & (TMIN.index.day >= 1) & (TMIN.index.day <= 30)]
+
         # 统计日最低气温小于0℃的天数
         cold_days_count = len(april_data[april_data < (-1.5)])
         april_cold_days_by_year[year] = cold_days_count
-    
+
     # 计算统计值
     if april_cold_days_by_year:
         cold_days_values = list(april_cold_days_by_year.values())
@@ -251,27 +246,25 @@ def calculate_tmin1(daily_data):
         mean_cold_days = 0
         max_cold_days = 0
         min_cold_days = 0
-    
-    
+
     return mean_cold_days, cold_days_values
 
 
-
-def normalize_values(values,min_val,max_val):
+def normalize_values(values, min_val, max_val):
     """
     归一化数值到0-1范围
     """
     if not values:
         return []
-    
+
     valid_values = [v for v in values if v is not None and not np.isnan(v)]
     if not valid_values:
         return [0.0] * len(values)
-        
+
     # 如果所有值都相同，归一化到0.5
     if max_val == min_val:
         return [0.5 if v is not None and not np.isnan(v) else 0.0 for v in values]
-    
+
     normalized = []
     for v in values:
         if v is None or np.isnan(v):
@@ -279,10 +272,10 @@ def normalize_values(values,min_val,max_val):
         else:
             norm_val = (v - min_val) / (max_val - min_val)
             normalized.append(norm_val)
-    
-    return normalized        
-        
-        
+
+    return normalized
+
+
 class WIWH_ZH:
     '''
     河南-冬小麦-灾害区划
@@ -291,47 +284,46 @@ class WIWH_ZH:
     麦收区连阴雨气候区划 TODO
     干热风区划 TODO
     '''
-    def _calculate_continuous_rain_indicators_station(self, station_indicators,params):
+
+    def _calculate_continuous_rain_indicators_station(self, station_indicators, params):
         """在站点级别计算连阴雨指标"""
         continuous_rain_indicators = {}
-        
+
         for station_id, indicators in station_indicators.items():
-            
+
             # 获取基础指标
             Pre = indicators.get('Pre', np.nan)  # 总降水量
             SSH = indicators.get('SSH', np.nan)  # 总日照时数
             Pre_days = indicators.get('Pre_days', np.nan)  # 降水日数
 
             # str转字典
-            Pre_df =pd.DataFrame.from_dict(Pre, orient='index')
-            SSH_df =pd.DataFrame.from_dict(SSH, orient='index')
-            Pre_days_df =pd.DataFrame.from_dict(Pre_days, orient='index')
+            Pre_df = pd.DataFrame.from_dict(Pre, orient='index')
+            SSH_df = pd.DataFrame.from_dict(SSH, orient='index')
+            Pre_days_df = pd.DataFrame.from_dict(Pre_days, orient='index')
 
             merged_df = pd.concat([Pre_df, SSH_df, Pre_days_df], axis=1)
-            merged_df.columns=['Pre','SSH','Pre_days']
-           
+            merged_df.columns = ['Pre', 'SSH', 'Pre_days']
+
             # 按标准赋值
-            merged_df['Pre']=merged_df['Pre'].apply(pre_category)
-            merged_df['SSH']=merged_df['SSH'].apply(ssh_category)
-            merged_df['Pre_days']=merged_df['Pre_days'].apply(pre_days_category)
+            merged_df['Pre'] = merged_df['Pre'].apply(pre_category)
+            merged_df['SSH'] = merged_df['SSH'].apply(ssh_category)
+            merged_df['Pre_days'] = merged_df['Pre_days'].apply(pre_days_category)
             cleaned_df = merged_df.dropna()
 
             # 年度指数
-            cleaned_df['年度指数']=cleaned_df['Pre']+cleaned_df['SSH']+cleaned_df['Pre_days']
-            
+            cleaned_df['年度指数'] = cleaned_df['Pre'] + cleaned_df['SSH'] + cleaned_df['Pre_days']
+
             # 连阴雨程度与
-            cleaned_df['连阴雨程度']=cleaned_df['年度指数'].apply(index)
-            
+            cleaned_df['连阴雨程度'] = cleaned_df['年度指数'].apply(index)
+
             # 综合指数
             frequency = cleaned_df['连阴雨程度'].value_counts().sort_index()
             for level in [0, 1, 2, 3]:
                 if level not in frequency:
                     frequency[level] = 0
-            weighted_frequency = (0.5 * frequency.get(3, 0) + 
-                                  0.3 * frequency.get(2, 0) + 
-                                  0.2 * frequency.get(1, 0))
-            continuous_rain_indicators[station_id] = weighted_frequency/len(cleaned_df)
-        
+            weighted_frequency = (0.5 * frequency.get(3, 0) + 0.3 * frequency.get(2, 0) + 0.2 * frequency.get(1, 0))
+            continuous_rain_indicators[station_id] = weighted_frequency / len(cleaned_df)
+
         max_value = max(continuous_rain_indicators.values())
         max_keys = [key for key, value in continuous_rain_indicators.items() if value == max_value]
         min_value = min(continuous_rain_indicators.values())
@@ -342,7 +334,7 @@ class WIWH_ZH:
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f'连阴雨指标_{timestamp}.csv'
-        result_df = pd.DataFrame(list(continuous_rain_indicators.items()),columns=['站点ID', '连阴雨综合指数'])
+        result_df = pd.DataFrame(list(continuous_rain_indicators.items()), columns=['站点ID', '连阴雨综合指数'])
         intermediate_dir = Path(params["resultPath"]) / "intermediate"
         intermediate_dir.mkdir(parents=True, exist_ok=True)
         output_path = intermediate_dir / filename
@@ -350,20 +342,20 @@ class WIWH_ZH:
         print(f"连阴雨指标综合指数文件已保存为 '{output_path}'")
 
         return continuous_rain_indicators
- 
+
     def _interpolate_continuous_rain_risk(self, continuous_rain_risk_station, station_coords, config, crop_config):
         """对连阴雨综合风险指数进行插值"""
         interpolation = crop_config.get("interpolation")
         interpolation_method = interpolation.get('method', 'lsm_idw')
         interpolation_params = interpolation.get('params', {})
-        
+
         interpolator = self._get_algorithm(f"interpolation.{interpolation_method}")
-        
+
         if interpolator is None:
             raise ValueError(f"不支持的插值方法: {interpolation_method}")
-        
+
         print(f"使用 {interpolation_method} 方法对综合风险指数进行插值")
-        
+
         # 准备插值数据
         interpolation_data = {
             'station_values': continuous_rain_risk_station,
@@ -373,33 +365,31 @@ class WIWH_ZH:
             'grid_path': config.get("gridFilePath", ""),
             'area_code': config.get("areaCode", "")
         }
-        
+
         # 执行插值
         try:
             interpolated_result = interpolator.execute(interpolation_data, interpolation_params)
             print("综合风险指数插值完成")
             # 保存中间结果
             self._save_intermediate_result(interpolated_result, config, "continuous_rain_risk_interpolated")
-            
+
             return interpolated_result
-            
+
         except Exception as e:
             print(f"综合风险指数插值失败: {str(e)}")
             raise
-    
 
-    def _save_intermediate_result(self, result: Dict[str, Any], params: Dict[str, Any], 
-                                indicator_name: str) -> None:
+    def _save_intermediate_result(self, result: Dict[str, Any], params: Dict[str, Any], indicator_name: str) -> None:
         """保存中间结果 - 各个指标的插值结果"""
         try:
             print(f"保存中间结果: {indicator_name}")
-            
+
             # 生成中间结果文件名
-            file_name = indicator_name+".tif"
+            file_name = indicator_name + ".tif"
             intermediate_dir = Path(params["resultPath"]) / "intermediate"
             intermediate_dir.mkdir(parents=True, exist_ok=True)
             output_path = intermediate_dir / file_name
-            
+
             # 使用与最终结果相同的保存逻辑
             if isinstance(result, dict) and 'data' in result and 'meta' in result:
                 data = result['data']
@@ -413,120 +403,46 @@ class WIWH_ZH:
             meta["nodata"] = -32768
             # 保存为GeoTIFF
             self._save_geotiff_gdal(data, meta, output_path)
-            
+
         except Exception as e:
             print(f"保存中间结果 {indicator_name} 失败: {str(e)}")
             # 不抛出异常，继续处理其他指标
-    
-    def _save_geotiff_gdal(self, data: np.ndarray, meta: Dict[str, Any], output_path: Path) -> None:
-        """使用GDAL保存为GeoTIFF文件"""
-        try:
-            from osgeo import gdal, osr
-            
-            # 确保数据是2D的
-            if len(data.shape) == 1:
-                # 如果是1D数据，需要知道宽度和高度才能重塑
-                if meta.get('width') and meta.get('height'):
-                    data = data.reshape((meta['height'], meta['width']))
-                else:
-                    # 如果不知道形状，创建为1行N列
-                    data = data.reshape((1, -1))
-            elif len(data.shape) > 2:
-                data = data.squeeze()  # 移除单维度
-            
-            # 获取数据形状
-            height, width = data.shape
-            
-            # 根据输入数据的 dtype 确定 GDAL 数据类型
-            if data.dtype == np.uint8:
-                datatype = gdal.GDT_Byte
-            elif data.dtype == np.uint16:
-                datatype = gdal.GDT_UInt16
-            elif data.dtype == np.int16:
-                datatype = gdal.GDT_Int16
-            elif data.dtype == np.uint32:
-                datatype = gdal.GDT_UInt32
-            elif data.dtype == np.int32:
-                datatype = gdal.GDT_Int32
-            elif data.dtype == np.float32:
-                datatype = gdal.GDT_Float32
-            elif data.dtype == np.float64:
-                datatype = gdal.GDT_Float64
-            else:
-                datatype = gdal.GDT_Float32  # 默认情况
-                
-            # 创建GeoTIFF文件
-            driver = gdal.GetDriverByName('GTiff')
-            
-            # 创建数据集
-            dataset = driver.Create(
-                str(output_path),
-                width,
-                height,
-                1,  # 波段数
-                datatype,
-                ['COMPRESS=LZW']  # 使用LZW压缩
-            )
-            
-            if dataset is None:
-                raise ValueError(f"无法创建文件: {output_path}")
-            
-            # 设置地理变换参数
-            transform = meta.get('transform')
-            dataset.SetGeoTransform(transform)
-            
-            # 设置投影
-            crs = meta.get('crs')
-            if crs is not None:
-                dataset.SetProjection(crs)
-            else:
-                print("警告: 没有坐标参考系统信息")
-            
-            # 获取波段并写入数据
-            band = dataset.GetRasterBand(1)
-            band.WriteArray(data)
-            
-            # 设置无数据值
-            nodata = meta.get('nodata')
-            if nodata is not None:
-                band.SetNoDataValue(float(nodata))
-            
-            # 关闭数据集，确保数据写入磁盘
-            dataset = None
-            
-            print(f"GeoTIFF文件保存成功: {output_path}")
-            
-        except ImportError as e:
-            print(f"导入GDAL失败: {str(e)}")
-        except Exception as e:
-            print(f"使用GDAL保存GeoTIFF失败: {str(e)}")
-            raise
 
-    def _numpy_to_gdal_dtype(self, numpy_dtype: np.dtype) -> int:
-        """将numpy数据类型转换为GDAL数据类型"""
+    def _save_geotiff_gdal(self, data: np.ndarray, meta: Dict, output_path: str, nodata=0):
+        """保存GeoTIFF文件"""
         from osgeo import gdal
-        
-        dtype_map = {
-            np.bool_: gdal.GDT_Byte,
-            np.uint8: gdal.GDT_Byte,
-            np.uint16: gdal.GDT_UInt16,
-            np.int16: gdal.GDT_Int16,
-            np.uint32: gdal.GDT_UInt32,
-            np.int32: gdal.GDT_Int32,
-            np.float32: gdal.GDT_Float32,
-            np.float64: gdal.GDT_Float64,
-            np.complex64: gdal.GDT_CFloat32,
-            np.complex128: gdal.GDT_CFloat64
-        }
-        
-        for np_type, gdal_type in dtype_map.items():
-            if np.issubdtype(numpy_dtype, np_type):
-                return gdal_type
-        
-        # 默认使用Float32
-        print(f"警告: 无法映射numpy数据类型 {numpy_dtype}，默认使用GDT_Float32")
-        return gdal.GDT_Float32
-          
+
+        # 根据输入数据的 dtype 确定 GDAL 数据类型
+        if data.dtype == np.uint8:
+            datatype = gdal.GDT_Byte
+        elif data.dtype == np.uint16:
+            datatype = gdal.GDT_UInt16
+        elif data.dtype == np.int16:
+            datatype = gdal.GDT_Int16
+        elif data.dtype == np.uint32:
+            datatype = gdal.GDT_UInt32
+        elif data.dtype == np.int32:
+            datatype = gdal.GDT_Int32
+        elif data.dtype == np.float32:
+            datatype = gdal.GDT_Float32
+        elif data.dtype == np.float64:
+            datatype = gdal.GDT_Float64
+        else:
+            datatype = gdal.GDT_Float32  # 默认情况
+
+        driver = gdal.GetDriverByName('GTiff')
+        dataset = driver.Create(output_path, meta['width'], meta['height'], 1, datatype, ['COMPRESS=LZW'])
+
+        dataset.SetGeoTransform(meta['transform'])
+        dataset.SetProjection(meta['crs'])
+
+        band = dataset.GetRasterBand(1)
+        band.WriteArray(data)
+        band.SetNoDataValue(nodata)
+
+        band.FlushCache()
+        dataset = None
+
     def _get_algorithm(self, algorithm_name: str) -> Any:
         """获取算法实例"""
         if algorithm_name not in self._algorithms:
@@ -582,9 +498,9 @@ class WIWH_ZH:
             m = np.array(means, dtype=float)
             vals.append(float(np.nansum(weights * m)))
 
-        total = float(sum(vals))
+        risk = float(sum(vals)) / float(len(years))
 
-        return total / float(len(years))
+        return risk
 
     def calculate_drought(self, params):
         '''
@@ -633,13 +549,12 @@ class WIWH_ZH:
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
-        
-        # 输出result的数值范围
-        data_min = float(np.nanmin(result['data']))
-        data_max = float(np.nanmax(result['data']))
-        print(f"干旱指数数值范围: {data_min:.4f} ~ {data_max:.4f}")
 
-        # 分级
+        # result['data'] = np.where(np.isnan(result['data']), 0, result['data'])
+        g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险指数.tif")
+        meta = result['meta']
+        self._save_geotiff_gdal(result['data'], meta, g_tif_path, 0)
+
         class_conf = algorithm_config.get('classification', {})
         if class_conf:
             algos = params.get('algorithms', {})
@@ -658,8 +573,6 @@ class WIWH_ZH:
             'type': '河南冬小麦干旱'
         }
 
-
-
     def calculate_dry(self, params):
         '''
         干热风区划
@@ -673,24 +586,24 @@ class WIWH_ZH:
         station_coords = params['station_coords']
         algorithmConfig = params['algorithmConfig']
         config = params['config']
-        
+
         print("开始计算小麦连阴雨风险 - 新流程：先计算站点综合风险指数")
-        
+
         try:
             # 第一步：在站点级别计算连阴雨指标
             print("第一步：在站点级别计算连阴雨指标")
-            continuous_rain_indicators = self._calculate_continuous_rain_indicators_station(station_indicators,config)
-            
+            continuous_rain_indicators = self._calculate_continuous_rain_indicators_station(station_indicators, config)
+
             # 第二步：对综合风险指数F进行插值
             print("第二步：对综合风险指数F进行插值")
             interpolated_risk = self._interpolate_continuous_rain_risk(continuous_rain_indicators, station_coords, config, algorithmConfig)
-            
+
             # 第三步：对插值结果进行分类
             print("第四步：对插值结果进行分类")
             classification = algorithmConfig['classification']
             classification_method = classification.get('method', 'custom_thresholds')
             classifier = self._get_algorithm(f"classification.{classification_method}")
-            
+
             classified_data = classifier.execute(interpolated_risk['data'], classification)
             # 准备最终结果
             result = {
@@ -705,6 +618,7 @@ class WIWH_ZH:
             print(f"小麦连阴雨风险计算失败: {str(e)}")
             result = np.nan
         return result
+
     def _calculate_frost(self, params):
         """霜冻灾害风险指数模型"""
         station_coords = params.get('station_coords', {})
@@ -722,33 +636,33 @@ class WIWH_ZH:
         station_ids = [sid for sid in station_ids if sid in available]
         start_date = cfg.get('startDate')
         end_date = cfg.get('endDate')
-        
+
         # 第一步：收集所有站点的d0和d1值
         station_d0_values = []
         station_d1_values = []
-        station_d0_list =[]
-        station_d1_list =[]
+        station_d0_list = []
+        station_d1_list = []
         station_data_map = {}  # 存储站点数据以便后续使用
-        
+
         print("收集所有站点的d0和d1值...")
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             station_data_map[sid] = daily
-            d0,d0list=calculate_tmin0(daily)
-            d1,d1list=calculate_tmin1(daily)
+            d0, d0list = calculate_tmin0(daily)
+            d1, d1list = calculate_tmin1(daily)
             station_d0_values.append(d0)
             station_d1_values.append(d1)
             station_d0_list.extend(d0list)
             station_d1_list.extend(d1list)
             #print(f"站点 {sid}: Ih={Ih:.4f}, Dv={Dv:.4f}")
-        min_val_d0=min(station_d0_list)
-        max_val_d0=max(station_d0_list)
-        min_val_d1=min(station_d1_list)
-        max_val_d1=max(station_d1_list)
+        min_val_d0 = min(station_d0_list)
+        max_val_d0 = max(station_d0_list)
+        min_val_d1 = min(station_d1_list)
+        max_val_d1 = max(station_d1_list)
         # 第二步：对所有站点的d0\d1进行归一化
-        normalized_d0 = normalize_values(station_d0_values,min_val_d0,max_val_d0)
-        normalized_d1 = normalize_values(station_d1_values,min_val_d1,max_val_d1)
-        
+        normalized_d0 = normalize_values(station_d0_values, min_val_d0, max_val_d0)
+        normalized_d1 = normalize_values(station_d1_values, min_val_d1, max_val_d1)
+
         # 输出归一化前后的统计信息
         if station_d0_values and station_d1_values:
             valid_d0 = [v for v in station_d0_values if v is not None and not np.isnan(v)]
@@ -758,7 +672,7 @@ class WIWH_ZH:
                 print(f"d1原始范围: {min(valid_d1):.4f} ~ {max(valid_d1):.4f}")
                 print(f"d0归一化范围: {min(normalized_d0):.4f} ~ {max(normalized_d0):.4f}")
                 print(f"d1归一化范围: {min(normalized_d1):.4f} ~ {max(normalized_d1):.4f}")
-        
+
         # 第三步：使用归一化后的d0和d1计算每个站点的W值
         station_values: Dict[str, float] = {}
         for i, sid in enumerate(station_ids):
@@ -768,7 +682,7 @@ class WIWH_ZH:
             low_value = 0.3 * d0_norm + 0.7 * d1_norm
             station_values[sid] = float(low_value) if np.isfinite(low_value) else np.nan
             print(f"站点 {sid}: d0_norm={d0_norm:.4f}, d1_norm={d1_norm:.4f}, low_value={low_value:.4f}")
-        
+
         # 第四步：插值计算
         interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
@@ -790,14 +704,14 @@ class WIWH_ZH:
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
-            
+
         # 分级
         class_conf = algorithm_config.get('classification', {})
         key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
-        classificator = params.get('algorithms', {})[key]    
+        classificator = params.get('algorithms', {})[key]
         # 执行
-        classdata = classificator.execute(result["data"], class_conf) 
-               
+        classdata = classificator.execute(result["data"], class_conf)
+
         return {
             'data': classdata,
             'meta': {
@@ -808,8 +722,6 @@ class WIWH_ZH:
             },
             'type': '河南冬小麦晚霜冻'
         }
-
-                 
 
     def calculate(self, params):
         config = params['config']

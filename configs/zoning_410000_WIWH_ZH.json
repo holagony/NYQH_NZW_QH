@@ -15,16 +15,11 @@
             "aggregation": "mean"
         },
         "interpolation": {
-            "method": "idw"
+            "method": "lsm-idw"
         },
         "classification": {
-            "method": "custom_thresholds",
-            "thresholds": [
-            {"min": 0,"max": 30, "level": 0, "label": "无旱"},    
-            {"min": 30, "max": 45, "level": 1, "label": "轻旱"},  
-            {"min": 45, "max": 55, "level": 2, "label": "中旱"},  
-            {"min": 55, "max": 65, "level": 3, "label": "重旱"},
-            {"min": 65, "max": 100, "level": 4, "label": "特旱"}]
+            "method": "natural_breaks",
+            "num_classes": 4
         }
     },
     "LCY": {
