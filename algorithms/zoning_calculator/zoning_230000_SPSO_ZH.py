@@ -7,7 +7,7 @@ Created on Fri Nov 14 15:12:07 2025
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any,Optional
+from typing import Dict, Any, Optional
 from math import pi
 from algorithms.data_manager import DataManager
 from algorithms.interpolation.idw import IDWInterpolation
@@ -101,8 +101,7 @@ def penman_et0(daily_data, lat_deg, elev_m, albedo=0.23, as_coeff=0.25, bs_coeff
     tmaxK = tmax + 273.16
     tminK = tmin + 273.16
     # 净长波辐射,含湿度与云量校正
-    Rnl = sigma * (
-        (tmaxK**4 + tminK**4) / 2.0) * (0.34 - 0.14 * np.sqrt(np.maximum(ea, 0))) * (1.35 * np.minimum(Rs / np.maximum(Rso, 1e-6), 1.0) - 0.35)
+    Rnl = sigma * ((tmaxK**4 + tminK**4) / 2.0) * (0.34 - 0.14 * np.sqrt(np.maximum(ea, 0))) * (1.35 * np.minimum(Rs / np.maximum(Rso, 1e-6), 1.0) - 0.35)
     Rn = Rns - Rnl
 
     P = _pressure_from_elevation(elev_m)
@@ -163,7 +162,6 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     return df
 
 
-
 class SPSO_ZH:
     '''
     黑龙江-大豆-灾害区划
@@ -192,14 +190,7 @@ class SPSO_ZH:
         print(f"使用 {interpolation_method} 方法对综合风险指数进行插值")
 
         # 准备插值数据
-        interpolation_data = {
-            'station_values': data,
-            'station_coords': station_coords,
-            'dem_path': config.get("demFilePath", ""),
-            'shp_path': config.get("shpFilePath", ""),
-            'grid_path': config.get("gridFilePath", ""),
-            'area_code': config.get("areaCode", "")
-        }
+        interpolation_data = {'station_values': data, 'station_coords': station_coords, 'dem_path': config.get("demFilePath", ""), 'shp_path': config.get("shpFilePath", ""), 'grid_path': config.get("gridFilePath", ""), 'area_code': config.get("areaCode", "")}
 
         # 执行插值
         try:
@@ -313,7 +304,7 @@ class SPSO_ZH:
         # 提取 CWDI 并按给定生育期（日界）进行逐年筛选
         series = df["CWDI"] if "CWDI" in df.columns else pd.Series(dtype=float)
         start_date_str = config.get("start_date")  # 形如 "MM-DD"
-        end_date_str = config.get("end_date")      # 形如 "MM-DD"
+        end_date_str = config.get("end_date")  # 形如 "MM-DD"
         year_offset = int(config.get("year_offset", 0))  # 跨年发育期支持：结束日所属年份 = 年份 + year_offset
         if start_date_str and end_date_str and not series.empty:
             years = series.index.year.unique()
@@ -433,7 +424,7 @@ class SPSO_ZH:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self.drought_station_g(daily, cwdi_config)
             station_values[sid] = float(g) if np.isfinite(g) else np.nan
-        
+
         # 输出插值前站点数值范围
         vals = [v for v in station_values.values() if not np.isnan(v)]
         if vals:
@@ -448,13 +439,7 @@ class SPSO_ZH:
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'
 
-        interp_data = {
-            'station_values': station_values,
-            'station_coords': station_coords,
-            'grid_path': cfg.get('gridFilePath'),
-            'dem_path': cfg.get('demFilePath'),
-            'area_code': cfg.get('areaCode'),
-            'shp_path': cfg.get('shpFilePath')}
+        interp_data = {'station_values': station_values, 'station_coords': station_coords, 'grid_path': cfg.get('gridFilePath'), 'dem_path': cfg.get('demFilePath'), 'area_code': cfg.get('areaCode'), 'shp_path': cfg.get('shpFilePath')}
 
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
@@ -462,7 +447,7 @@ class SPSO_ZH:
             result = IDWInterpolation().execute(interp_data, iparams)
 
         # 数值设置 + tiff保存
-        result['data'] = normalize_array(result['data']) # 归一化
+        result['data'] = normalize_array(result['data'])  # 归一化
         g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱危险性指数.tif")
         self._save_geotiff_gdal(result['data'], result['meta'], g_tif_path, 0)
 
@@ -474,15 +459,7 @@ class SPSO_ZH:
             if key in algos:
                 result['data'] = algos[key].execute(result['data'], class_conf)
 
-        return {
-            'data': result['data'],
-            'meta': {
-                'width': result['meta']['width'],
-                'height': result['meta']['height'],
-                'transform': result['meta']['transform'],
-                'crs': result['meta']['crs']
-            }
-        }
+        return {'data': result['data'], 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}}
 
     def _calculate_frost(self, params):
         '''
@@ -509,22 +486,31 @@ class SPSO_ZH:
         available = set(dm.get_all_stations())
         station_ids = [sid for sid in station_ids if sid in available]
 
-        start_date = params.get('startDate')
-        end_date = params.get('endDate')
-        start_year_cfg = int(str(start_date)[:4]) if start_date else None
-        end_year_cfg = int(str(end_date)[:4]) if end_date else None
+        start_date = params.get('startDate') or config.get('startDate')
+        end_date = params.get('endDate') or config.get('endDate')
+        start_year_cfg = int(str(start_date)[:4])
+        end_year_cfg = int(str(end_date)[:4])
 
         min_target_year = start_year_cfg
         max_target_year = end_year_cfg
-        if min_target_year <= 1991:
-            load_start_date = int("19610101")
-            end_y = max(1990, max_target_year)
-            load_end_date = int(f"{end_y}1231")
+
+        # 数据加载时间范围与基准期选择规则：
+        # - 若目标年份 ≤1991，加载1961–1990并采用固定基准期；
+        # - 否则加载最近30年并采用滑动30年窗口。
+        if min_target_year is not None and max_target_year is not None:
+            if min_target_year <= 1991:
+                load_start_date = int("19610101")
+                end_y = max(1990, max_target_year)
+                load_end_date = int(f"{end_y}1231")
+            else:
+                load_start_date = int(f"{min_target_year - 30}0101")
+                load_end_date = int(f"{max_target_year}1231")
         else:
-            load_start_date = int(f"{min_target_year - 30}0101")
-            load_end_date = int(f"{max_target_year}1231")
+            load_start_date = None
+            load_end_date = None
 
         def _ensure_tavg(df):
+            # 补全平均气温tavg：若缺失则用(tmax+tmin)/2
             if 'tavg' in df.columns:
                 return df
             if 'tmax' in df.columns and 'tmin' in df.columns:
@@ -533,6 +519,7 @@ class SPSO_ZH:
             return df
 
         def _sum_monthly_means(df, year):
+            # 计算某年5–9月各月平均温度之和ΣT5–9
             sub = df[(df.index.year == year) & (df.index.month.isin([5, 6, 7, 8, 9]))]
             if sub.empty:
                 return np.nan
@@ -566,7 +553,10 @@ class SPSO_ZH:
             all_years = sorted(vals_by_year.keys())
 
             # 只保留实际年份
-            target_years = [y for y in all_years if start_year_cfg <= y <= end_year_cfg]
+            if start_year_cfg is not None and end_year_cfg is not None:
+                target_years = [y for y in all_years if start_year_cfg <= y <= end_year_cfg]
+            else:
+                target_years = all_years
             if not target_years:
                 dt_values[sid] = np.nan
                 continue
@@ -575,14 +565,14 @@ class SPSO_ZH:
             # first_year_all/last_year_all 分别表示该站可用数据的最早/最晚年份
             # total_years_all 用于判断是否具备至少 30 年的历史以支撑固定或滑动基准期
             first_year_all = all_years[0]
-            last_year_all = all_years[-1]
             total_years_all = len(all_years)
 
-            # 对每个目标年份 y，选择其对应的基准期并计算距平
+            # 对每个目标年份y，选择其基准期并计算距平ΔT5–9
             for y in target_years:
                 result_dict[sid][str(y)] = dict()
 
-                # 若该站点可用年份不足 30 年，则退化为“从最早可用数据到 y-1”的基准
+                # 基准期选择：不足30年退化为[first_year_all, y-1]；
+                # 固定基准期(y≤1991)用1961–1990；滑动基准期(y≥1992)用[y-30, y-1]
                 if total_years_all < 30:
                     win_start, win_end = first_year_all, y - 1
                 else:
@@ -598,13 +588,133 @@ class SPSO_ZH:
                 if not win_years:
                     continue
 
-                # 基准温度为基准期内 ΣTi 的平均值，距平定义为当年 ΣTi 减去该基准
+                # 计算基准均值与距平：baseline_avg=mean(ΣT5–9@基准期)，delta=ΣT5–9@当年 - baseline_avg
                 baseline_avg = float(np.mean([vals_by_year[yy] for yy in win_years]))
                 delta = float(vals_by_year[y] - baseline_avg)
                 result_dict[sid][str(y)]['delta'] = delta
                 result_dict[sid][str(y)]['baseline_avg'] = baseline_avg
 
-        return result_dict
+            # 阈值判定冷害年：按ΣT5–9归属等级I–V，并用ΔT5–9阈值判定轻/中/重
+            cold_years = []
+            intensities = []
+            for y_str, vals in result_dict[sid].items():
+                if 'delta' not in vals or 'baseline_avg' not in vals:
+                    continue
+                s = float(vals['baseline_avg'])
+                d = float(vals['delta'])
+                level = None
+                if s <= 80:
+                    level = 'I'
+                elif 80 < s <= 85:
+                    level = 'II'
+                elif 85 < s <= 90:
+                    level = 'III'
+                elif 90 < s <= 95:
+                    level = 'IV'
+                else:
+                    level = 'V'
+
+                is_cold = False
+                if level == 'I':
+                    if -2.0 <= d <= -1.8:
+                        is_cold = True
+                    elif -2.2 <= d < -2.0:
+                        is_cold = True
+                    elif d < -2.2:
+                        is_cold = True
+                elif level == 'II':
+                    if -2.2 <= d <= -1.9:
+                        is_cold = True
+                    elif -2.5 <= d < -2.2:
+                        is_cold = True
+                    elif d < -2.5:
+                        is_cold = True
+                elif level == 'III':
+                    if -2.3 <= d <= -1.9:
+                        is_cold = True
+                        severity = 'light'
+                    elif -2.7 <= d < -2.3:
+                        is_cold = True
+                    elif d < -2.7:
+                        is_cold = True
+                elif level == 'IV':
+                    if -2.4 <= d <= -2.0:
+                        is_cold = True
+                    elif -2.9 <= d < -2.4:
+                        is_cold = True
+                    elif d < -2.9:
+                        is_cold = True
+                else:
+                    if -2.6 <= d <= -2.0:
+                        is_cold = True
+                    elif -3.1 <= d < -2.6:
+                        is_cold = True
+                    elif d < -3.1:
+                        is_cold = True
+
+                # 增加结果key和value
+                vals['level'] = level
+                vals['is_cold_year'] = bool(is_cold)
+                if is_cold:
+                    cold_years.append(y_str)
+                    intensities.append(abs(d))  # d本身为负表示冷害年强度，取绝对值
+
+            # 每站冷害年统计：总年数、冷害年数、平均强度与频率
+            total_years = len([y for y in result_dict[sid].keys() if str(y).isdigit()])
+            cold_count = len(cold_years)
+            avg_intensity = float(np.mean(intensities)) if len(intensities) > 0 else 0  # 这一行注意，未来插值看看考不考虑0的
+            frequency = float(cold_count / total_years) if cold_count > 0 else 0
+            result_dict[sid]['_stats'] = {'cold_year_count': cold_count, 'avg_intensity': avg_intensity, 'frequency': frequency}
+
+        # 计算危险性
+        sids = []
+        intens_arr = []
+        freq_arr = []
+        for sid, stats in result_dict.items():
+            sids.append(sid)
+            intens_arr.append(stats['_stats']['avg_intensity'])
+            freq_arr.append(stats['_stats']['frequency'])
+
+        # 跨站点归一化与危险性综合：min-max归一化后dangerous=0.25*强度+0.75*频率
+        intens_arr = np.array(intens_arr, dtype=float)
+        freq_arr = np.array(freq_arr, dtype=float)
+        ai_min, ai_max = float(np.min(intens_arr)), float(np.max(intens_arr))
+        fr_min, fr_max = float(np.min(freq_arr)), float(np.max(freq_arr))
+        ai_norm = np.zeros_like(intens_arr)
+        fr_norm = np.zeros_like(freq_arr)
+        if ai_max > ai_min:
+            ai_norm = (intens_arr - ai_min) / (ai_max - ai_min)
+        if fr_max > fr_min:
+            fr_norm = (freq_arr - fr_min) / (fr_max - fr_min)
+        dangerous_vals = 0.25 * ai_norm + 0.75 * fr_norm
+
+        # 站点与坐标匹配
+        sid_to_idx = {sid: i for i, sid in enumerate(sids)}
+        common_sids = [sid for sid in sids if sid in station_coords]
+        dangerous_station = {sid: float(dangerous_vals[sid_to_idx[sid]]) for sid in common_sids}
+        coords_used = {sid: station_coords[sid] for sid in common_sids}
+
+        # 插值参数与数据准备
+        interp_conf = algorithmConfig.get('interpolation')
+        method = str(interp_conf.get('method', 'idw')).lower()
+        iparams = interp_conf.get('params', {})
+
+        if 'var_name' not in iparams:
+            iparams['var_name'] = 'value'
+
+        interp_data = {'station_values': dangerous_station, 'station_coords': coords_used, 'grid_path': config.get('gridFilePath'), 'dem_path': config.get('demFilePath'), 'area_code': config.get('areaCode'), 'shp_path': config.get('shpFilePath')}
+
+        if method == 'lsm_idw':
+            result = LSMIDWInterpolation().execute(interp_data, iparams)
+        else:
+            result = IDWInterpolation().execute(interp_data, iparams)
+
+        # 归一化栅格并保存中间结果tif
+        # result['data'] = normalize_array(result['data'])
+        g_tif_path = os.path.join(config.get("resultPath"), "intermediate", "低温冷害危险性指数.tif")
+        self._save_geotiff_gdal(result['data'], result['meta'], g_tif_path, 0)
+
+        return {'data': result['data'], 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}, 'type': '黑龙江低温冷害'}
 
     def _calculate_ZL(self, params):
         '''

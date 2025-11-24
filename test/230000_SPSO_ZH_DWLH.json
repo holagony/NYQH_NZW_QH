@@ -1,0 +1,22 @@
+{
+  "taskId": "123456",
+  "algoFrom": "zoning_230000_SPSO_ZH",
+  "cropCode": "SPSO",
+  "zoningType": "ZH",
+  "inputFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\inputdata\\tianqing_stn",
+  "areaCode": "230000",
+  "areaName": "黑龙江省",
+  "element": "DWLH",
+  "startDate": "19910101",
+  "endDate": "20201231",
+  "stationFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\depend\\station.csv",  
+  "gridFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\depend\\grid\\230000_30grid_wgs84.tif",
+  "demFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\depend\\dem\\china_dem_230000.tif",
+  "shpFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\depend\\shp\\230000_wgs84.shp",
+  "otherFilesPath": "",
+  "resultLogPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_DWLH\\resultLogFile.json",
+  "resultJsonPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_DWLH\\resultJsonFile.json",
+  "resultFlowPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_DWLH\\resultFlowFile.json",
+  "resultPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_DWLH",
+  "algorithmConfig": {}
+}

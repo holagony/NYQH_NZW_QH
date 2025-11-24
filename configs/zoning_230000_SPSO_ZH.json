@@ -22,6 +22,22 @@
             "num_classes": 4
         }
     },
+    "DWLH": {
+        "indicators": {},
+        "dwlh": {
+            "start_date": "01-01",
+            "end_date": "12-31",
+            "year_offset": 0,
+            "aggregation": "mean"
+        },
+        "interpolation": {
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "natural_breaks",
+            "num_classes": 4
+        }
+    },
     "ZL": {
         "indicators": {
             "D50": {
