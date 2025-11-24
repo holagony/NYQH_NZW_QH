@@ -103,7 +103,7 @@ class IDWInterpolation():
     def _idw_interpolation_improved(self, stations_data: pd.DataFrame, grid_path: str,
                                   shp_path: str, area_code: str, var_name: str,
                                   radius_dist: float, min_num: int, first_size: int,
-                                  fill_nans: bool,grid_nodata: float) -> Dict[str, Any]:
+                                  fill_nans: bool, grid_nodata: float) -> Dict[str, Any]:
         """改进的IDW插值算法"""
         temp_path = None
         aligned_grid = None
@@ -134,6 +134,7 @@ class IDWInterpolation():
                 radius_dist=radius_dist,
                 min_num=min_num,
                 first_size=first_size,
+                mask_grid_path=grid_path,
                 grid_nodata=grid_nodata
             )
 
