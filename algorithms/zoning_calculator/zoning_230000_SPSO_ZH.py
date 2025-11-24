@@ -18,6 +18,34 @@ from scipy.ndimage import sobel
 from pathlib import Path
 
 
+def normalize_array(array: np.ndarray) -> np.ndarray:
+    """
+    归一化数组到0-1范围
+    """
+    if array.size == 0:
+        return array
+
+    # 创建一个掩码来标识非NaN值
+    mask = ~np.isnan(array)
+
+    if not np.any(mask):
+        return np.zeros_like(array)
+
+    valid_values = array[mask]
+    min_val = np.min(valid_values)
+    max_val = np.max(valid_values)
+
+    # 如果所有有效值都相同，归一化到0.5
+    if max_val == min_val:
+        normalized_array = np.full_like(array, 0.5, dtype=float)
+        normalized_array[~mask] = np.nan
+    else:
+        normalized_array = (array - min_val) / (max_val - min_val)
+        normalized_array[~mask] = np.nan
+
+    return normalized_array
+
+
 def _sat_vapor_pressure(T):
     return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa),T为气温(°C)
 
@@ -102,11 +130,12 @@ def calculate_cwdi(daily_data, weights, lat_deg=None, elev_m=None):
     years = df.index.year.unique()
     kc_series = pd.Series(0.0, index=df.index)
     for y in years:
-        kc_series[(df.index >= pd.Timestamp(y, 5, 12)) & (df.index <= pd.Timestamp(y, 5, 25))] = 0.32
-        kc_series[(df.index >= pd.Timestamp(y, 5, 26)) & (df.index <= pd.Timestamp(y, 6, 23))] = 0.51
-        kc_series[(df.index >= pd.Timestamp(y, 6, 24)) & (df.index <= pd.Timestamp(y, 7, 4))] = 0.69
-        kc_series[(df.index >= pd.Timestamp(y, 7, 5)) & (df.index <= pd.Timestamp(y, 8, 25))] = 1.15
-        kc_series[(df.index >= pd.Timestamp(y, 8, 26)) & (df.index <= pd.Timestamp(y, 9, 18))] = 0.5
+        kc_series[(df.index >= pd.Timestamp(y, 4, 21)) & (df.index <= pd.Timestamp(y, 5, 20))] = 0.45
+        kc_series[(df.index >= pd.Timestamp(y, 5, 21)) & (df.index <= pd.Timestamp(y, 6, 10))] = 0.6
+        kc_series[(df.index >= pd.Timestamp(y, 6, 11)) & (df.index <= pd.Timestamp(y, 7, 10))] = 0.9
+        kc_series[(df.index >= pd.Timestamp(y, 7, 11)) & (df.index <= pd.Timestamp(y, 8, 10))] = 1.32
+        kc_series[(df.index >= pd.Timestamp(y, 8, 11)) & (df.index <= pd.Timestamp(y, 8, 31))] = 1.2
+        kc_series[(df.index >= pd.Timestamp(y, 9, 1)) & (df.index <= pd.Timestamp(y, 10, 10))] = 0.7
 
     df['ETc'] = kc_series * df['ET0']
     etc_shift = df['ETc'].shift(1)
@@ -139,7 +168,7 @@ class SPSO_ZH:
     '''
     黑龙江-大豆-灾害区划
     大豆干旱
-    大豆冷害 TODO
+    大豆冷害
     大豆霜冻 TODO
     大豆渍涝 TODO
     '''
@@ -214,89 +243,40 @@ class SPSO_ZH:
             print(f"保存中间结果 {indicator_name} 失败: {str(e)}")
             # 不抛出异常,继续处理其他指标
 
-    def _save_geotiff_gdal(self, data: np.ndarray, meta: Dict[str, Any], output_path: Path) -> None:
-        """使用GDAL保存为GeoTIFF文件"""
-        try:
-            from osgeo import gdal, osr
+    def _save_geotiff_gdal(self, data: np.ndarray, meta: Dict, output_path: str, nodata=0):
+        """保存GeoTIFF文件"""
+        from osgeo import gdal
 
-            # 确保数据是2D的
-            if len(data.shape) == 1:
-                # 如果是1D数据，需要知道宽度和高度才能重塑
-                if meta.get('width') and meta.get('height'):
-                    data = data.reshape((meta['height'], meta['width']))
-                else:
-                    # 如果不知道形状，创建为1行N列
-                    data = data.reshape((1, -1))
-            elif len(data.shape) > 2:
-                data = data.squeeze()  # 移除单维度
+        # 根据输入数据的 dtype 确定 GDAL 数据类型
+        if data.dtype == np.uint8:
+            datatype = gdal.GDT_Byte
+        elif data.dtype == np.uint16:
+            datatype = gdal.GDT_UInt16
+        elif data.dtype == np.int16:
+            datatype = gdal.GDT_Int16
+        elif data.dtype == np.uint32:
+            datatype = gdal.GDT_UInt32
+        elif data.dtype == np.int32:
+            datatype = gdal.GDT_Int32
+        elif data.dtype == np.float32:
+            datatype = gdal.GDT_Float32
+        elif data.dtype == np.float64:
+            datatype = gdal.GDT_Float64
+        else:
+            datatype = gdal.GDT_Float32  # 默认情况
 
-            # 获取数据形状
-            height, width = data.shape
+        driver = gdal.GetDriverByName('GTiff')
+        dataset = driver.Create(output_path, meta['width'], meta['height'], 1, datatype, ['COMPRESS=LZW'])
 
-            # 根据输入数据的 dtype 确定 GDAL 数据类型
-            if data.dtype == np.uint8:
-                datatype = gdal.GDT_Byte
-            elif data.dtype == np.uint16:
-                datatype = gdal.GDT_UInt16
-            elif data.dtype == np.int16:
-                datatype = gdal.GDT_Int16
-            elif data.dtype == np.uint32:
-                datatype = gdal.GDT_UInt32
-            elif data.dtype == np.int32:
-                datatype = gdal.GDT_Int32
-            elif data.dtype == np.float32:
-                datatype = gdal.GDT_Float32
-            elif data.dtype == np.float64:
-                datatype = gdal.GDT_Float64
-            else:
-                datatype = gdal.GDT_Float32  # 默认情况
+        dataset.SetGeoTransform(meta['transform'])
+        dataset.SetProjection(meta['crs'])
 
-            # 创建GeoTIFF文件
-            driver = gdal.GetDriverByName('GTiff')
+        band = dataset.GetRasterBand(1)
+        band.WriteArray(data)
+        band.SetNoDataValue(nodata)
 
-            # 创建数据集
-            dataset = driver.Create(
-                str(output_path),
-                width,
-                height,
-                1,  # 波段数
-                datatype,
-                ['COMPRESS=LZW']  # 使用LZW压缩
-            )
-
-            if dataset is None:
-                raise ValueError(f"无法创建文件: {output_path}")
-
-            # 设置地理变换参数
-            transform = meta.get('transform')
-            dataset.SetGeoTransform(transform)
-
-            # 设置投影
-            crs = meta.get('crs')
-            if crs is not None:
-                dataset.SetProjection(crs)
-            else:
-                print("警告: 没有坐标参考系统信息")
-
-            # 获取波段并写入数据
-            band = dataset.GetRasterBand(1)
-            band.WriteArray(data)
-
-            # 设置无数据值
-            nodata = meta.get('nodata')
-            if nodata is not None:
-                band.SetNoDataValue(float(nodata))
-
-            # 关闭数据集，确保数据写入磁盘
-            dataset = None
-
-            print(f"GeoTIFF文件保存成功: {output_path}")
-
-        except ImportError as e:
-            print(f"导入GDAL失败: {str(e)}")
-        except Exception as e:
-            print(f"使用GDAL保存GeoTIFF失败: {str(e)}")
-            raise
+        band.FlushCache()
+        dataset = None
 
     def _numpy_to_gdal_dtype(self, numpy_dtype: np.dtype) -> int:
         """将numpy数据类型转换为GDAL数据类型"""
@@ -388,6 +368,7 @@ class SPSO_ZH:
             for s0, e0 in zip(starts, ends):
                 Di = float(e0 - s0)
                 Si = float(np.sum(v[s0:e0] - cwdi0))
+                # 只累积“有效干旱事件”。即：干旱事件持续时间 > 0 且干旱强度 > 0
                 if Di > 0 and Si > 0:
                     Dtotal += Di
                     Stotal += Si
@@ -399,7 +380,9 @@ class SPSO_ZH:
 
         if not stotals:
             return np.nan
-        return float(np.mean(stotals))
+
+        # 先按年求和，再对多年求平均
+        return float(np.sum(stotals) / len(stotals))
 
     def calculate_ZL_HazardRisk(self, station_indicators, params):
         ZL = {}
@@ -450,6 +433,13 @@ class SPSO_ZH:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self.drought_station_g(daily, cwdi_config)
             station_values[sid] = float(g) if np.isfinite(g) else np.nan
+        
+        # 输出插值前站点数值范围
+        vals = [v for v in station_values.values() if not np.isnan(v)]
+        if vals:
+            data_min = float(np.min(vals))
+            data_max = float(np.max(vals))
+            print(f"插值前站点数值范围: {data_min:.4f} ~ {data_max:.4f}")
 
         interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
@@ -464,18 +454,17 @@ class SPSO_ZH:
             'grid_path': cfg.get('gridFilePath'),
             'dem_path': cfg.get('demFilePath'),
             'area_code': cfg.get('areaCode'),
-            'shp_path': cfg.get('shpFilePath')
-        }
+            'shp_path': cfg.get('shpFilePath')}
 
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
 
-        # 输出result的数值范围
-        data_min = float(np.nanmin(result['data']))
-        data_max = float(np.nanmax(result['data']))
-        print(f"干旱指数数值范围: {data_min:.4f} ~ {data_max:.4f}")
+        # 数值设置 + tiff保存
+        result['data'] = normalize_array(result['data']) # 归一化
+        g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱危险性指数.tif")
+        self._save_geotiff_gdal(result['data'], result['meta'], g_tif_path, 0)
 
         # 分级
         class_conf = algorithm_config.get('classification', {})

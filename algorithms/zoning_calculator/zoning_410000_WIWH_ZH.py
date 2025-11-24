@@ -12,6 +12,34 @@ import datetime
 import os
 
 
+def normalize_array(array: np.ndarray) -> np.ndarray:
+    """
+    归一化数组到0-1范围
+    """
+    if array.size == 0:
+        return array
+
+    # 创建一个掩码来标识非NaN值
+    mask = ~np.isnan(array)
+
+    if not np.any(mask):
+        return np.zeros_like(array)
+
+    valid_values = array[mask]
+    min_val = np.min(valid_values)
+    max_val = np.max(valid_values)
+
+    # 如果所有有效值都相同，归一化到0.5
+    if max_val == min_val:
+        normalized_array = np.full_like(array, 0.5, dtype=float)
+        normalized_array[~mask] = np.nan
+    else:
+        normalized_array = (array - min_val) / (max_val - min_val)
+        normalized_array[~mask] = np.nan
+
+    return normalized_array
+
+
 def _sat_vapor_pressure(T):
     return 0.6108 * np.exp(17.27 * T / (T + 237.3))  # 饱和水汽压(kPa)，T为气温(°C)
 
@@ -67,8 +95,7 @@ def penman_et0(daily_data, lat_deg, elev_m, albedo=0.23, as_coeff=0.25, bs_coeff
     tmaxK = tmax + 273.16
     tminK = tmin + 273.16
     # 净长波辐射，含湿度与云量校正
-    Rnl = sigma * (
-        (tmaxK**4 + tminK**4) / 2.0) * (0.34 - 0.14 * np.sqrt(np.maximum(ea, 0))) * (1.35 * np.minimum(Rs / np.maximum(Rso, 1e-6), 1.0) - 0.35)
+    Rnl = sigma * ((tmaxK**4 + tminK**4) / 2.0) * (0.34 - 0.14 * np.sqrt(np.maximum(ea, 0))) * (1.35 * np.minimum(Rs / np.maximum(Rso, 1e-6), 1.0) - 0.35)
     Rn = Rns - Rnl
 
     P = _pressure_from_elevation(elev_m)
@@ -357,14 +384,7 @@ class WIWH_ZH:
         print(f"使用 {interpolation_method} 方法对综合风险指数进行插值")
 
         # 准备插值数据
-        interpolation_data = {
-            'station_values': continuous_rain_risk_station,
-            'station_coords': station_coords,
-            'dem_path': config.get("demFilePath", ""),
-            'shp_path': config.get("shpFilePath", ""),
-            'grid_path': config.get("gridFilePath", ""),
-            'area_code': config.get("areaCode", "")
-        }
+        interpolation_data = {'station_values': continuous_rain_risk_station, 'station_coords': station_coords, 'dem_path': config.get("demFilePath", ""), 'shp_path': config.get("shpFilePath", ""), 'grid_path': config.get("gridFilePath", ""), 'area_code': config.get("areaCode", "")}
 
         # 执行插值
         try:
@@ -485,10 +505,8 @@ class WIWH_ZH:
         weights = np.array([0.09, 0.13, 0.11, 0.12, 0.20, 0.22, 0.13], dtype=float)
         vals = []
         for y in years:
-            ranges = [(pd.Timestamp(y - 1, 8, 1), pd.Timestamp(y - 1, 10, 10)), (pd.Timestamp(y - 1, 10, 11), pd.Timestamp(y - 1, 12, 20)),
-                      (pd.Timestamp(y - 1, 12, 21), pd.Timestamp(y, 2, 20)), (pd.Timestamp(y, 2, 21), pd.Timestamp(y, 3, 31)),
-                      (pd.Timestamp(y, 4, 1), pd.Timestamp(y, 4, 30)), (pd.Timestamp(y, 5, 1), pd.Timestamp(y, 5, 20)),
-                      (pd.Timestamp(y, 5, 21), pd.Timestamp(y, 6, 10))]
+            ranges = [(pd.Timestamp(y - 1, 8, 1), pd.Timestamp(y - 1, 10, 10)), (pd.Timestamp(y - 1, 10, 11), pd.Timestamp(y - 1, 12, 20)), (pd.Timestamp(y - 1, 12, 21), pd.Timestamp(y, 2, 20)), (pd.Timestamp(y, 2, 21), pd.Timestamp(y, 3, 31)), (pd.Timestamp(y, 4, 1), pd.Timestamp(y, 4, 30)),
+                      (pd.Timestamp(y, 5, 1), pd.Timestamp(y, 5, 20)), (pd.Timestamp(y, 5, 21), pd.Timestamp(y, 6, 10))]
 
             means = []
             for s, e in ranges:
@@ -536,14 +554,7 @@ class WIWH_ZH:
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'
 
-        interp_data = {
-            'station_values': station_values,
-            'station_coords': station_coords,
-            'grid_path': cfg.get('gridFilePath'),
-            'dem_path': cfg.get('demFilePath'),
-            'area_code': cfg.get('areaCode'),
-            'shp_path': cfg.get('shpFilePath')
-        }
+        interp_data = {'station_values': station_values, 'station_coords': station_coords, 'grid_path': cfg.get('gridFilePath'), 'dem_path': cfg.get('demFilePath'), 'area_code': cfg.get('areaCode'), 'shp_path': cfg.get('shpFilePath')}
 
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
@@ -551,6 +562,7 @@ class WIWH_ZH:
             result = IDWInterpolation().execute(interp_data, iparams)
 
         # result['data'] = np.where(np.isnan(result['data']), 0, result['data'])
+        result['data'] = normalize_array(result['data'])  # 归一化
         g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险指数.tif")
         meta = result['meta']
         self._save_geotiff_gdal(result['data'], meta, g_tif_path, 0)
@@ -562,16 +574,7 @@ class WIWH_ZH:
             if key in algos:
                 result['data'] = algos[key].execute(result['data'], class_conf)
 
-        return {
-            'data': result['data'],
-            'meta': {
-                'width': result['meta']['width'],
-                'height': result['meta']['height'],
-                'transform': result['meta']['transform'],
-                'crs': result['meta']['crs']
-            },
-            'type': '河南冬小麦干旱'
-        }
+        return {'data': result['data'], 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}, 'type': '河南冬小麦干旱'}
 
     def calculate_dry(self, params):
         '''
@@ -606,12 +609,7 @@ class WIWH_ZH:
 
             classified_data = classifier.execute(interpolated_risk['data'], classification)
             # 准备最终结果
-            result = {
-                'data': classified_data,
-                'meta': interpolated_risk['meta'],
-                'type': 'continuous_rain_risk',
-                'process': 'station_level_calculation'
-            }
+            result = {'data': classified_data, 'meta': interpolated_risk['meta'], 'type': 'continuous_rain_risk', 'process': 'station_level_calculation'}
             print("小麦连阴雨风险计算完成")
 
         except Exception as e:
@@ -691,14 +689,7 @@ class WIWH_ZH:
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'
 
-        interp_data = {
-            'station_values': station_values,
-            'station_coords': station_coords,
-            'grid_path': cfg.get('gridFilePath'),
-            'dem_path': cfg.get('demFilePath'),
-            'area_code': cfg.get('areaCode'),
-            'shp_path': cfg.get('shpFilePath')
-        }
+        interp_data = {'station_values': station_values, 'station_coords': station_coords, 'grid_path': cfg.get('gridFilePath'), 'dem_path': cfg.get('demFilePath'), 'area_code': cfg.get('areaCode'), 'shp_path': cfg.get('shpFilePath')}
 
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
@@ -712,16 +703,7 @@ class WIWH_ZH:
         # 执行
         classdata = classificator.execute(result["data"], class_conf)
 
-        return {
-            'data': classdata,
-            'meta': {
-                'width': result['meta']['width'],
-                'height': result['meta']['height'],
-                'transform': result['meta']['transform'],
-                'crs': result['meta']['crs']
-            },
-            'type': '河南冬小麦晚霜冻'
-        }
+        return {'data': classdata, 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}, 'type': '河南冬小麦晚霜冻'}
 
     def calculate(self, params):
         config = params['config']
