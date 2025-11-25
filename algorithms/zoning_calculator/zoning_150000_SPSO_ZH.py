@@ -12,6 +12,7 @@ from math import pi
 from algorithms.data_manager import DataManager
 from algorithms.interpolation.idw import IDWInterpolation
 from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
+from algorithms.interpolation.lsm import LSMInterpolation
 import os
 from osgeo import gdal
 from scipy.ndimage import sobel
@@ -426,7 +427,7 @@ class SPSO_ZH:
             Ih, Dv = calculate_Ih_Dv(daily)
             station_ih_values.append(Ih)
             station_dv_values.append(Dv)
-            print(f"站点 {sid}: Ih={Ih:.4f}, Dv={Dv:.4f}")
+            #(f"站点 {sid}: Ih={Ih:.4f}, Dv={Dv:.4f}")
 
         # 第二步：对所有站点的Ih和Dv进行归一化
         normalized_ih = normalize_values(station_ih_values)
@@ -471,9 +472,11 @@ class SPSO_ZH:
 
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
-        else:
+        elif method== "LSM":
+            result = LSMInterpolation().execute(interp_data, iparams)
+        elif method=="idw":
             result = IDWInterpolation().execute(interp_data, iparams)
-
+            print("进行反距离权重插值")
         W_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "致灾危险性指数.tif")
         self._save_geotiff(result['data'], result['meta'], W_tif_path, 0)  # 保存致灾危险性指数tif
 
@@ -485,7 +488,7 @@ class SPSO_ZH:
         self._save_geotiff(M_value, result['meta'], M_tif_path, 0)  # 保存孕灾环境敏感性指数tif
 
         # 霜冻承灾体暴露度指数C，承载体脆弱性指标(大豆种植面积比例栅格数据)
-        ZZ_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/内蒙古承载体脆弱性c.tif"
+        ZZ_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/内蒙古承载体脆弱性.tif"
         ZZ_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/ZZ_temp.tif"
         ZZ_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], ZZ_percent_path, ZZ_temp_path)
         in_ds_C = gdal.Open(ZZ_temp_path)
@@ -494,7 +497,7 @@ class SPSO_ZH:
         C_array = np.where(C_array == Nodata, np.nan, C_array)
 
         # 霜冻防灾减灾能力指数F(灌溉面积百分比)
-        GG_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/内蒙古防灾减灾能力c.tif"
+        GG_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/内蒙古防灾减灾能力.tif"
         GG_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/GG_temp.tif"
         GG_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], GG_percent_path, GG_temp_path)
         in_ds_F = gdal.Open(GG_temp_path)
