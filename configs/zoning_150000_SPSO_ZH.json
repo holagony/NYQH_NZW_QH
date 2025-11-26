@@ -29,7 +29,7 @@
             "end_date": "12-31"
         },
         "interpolation": {
-            "method": "lsm_idw",
+            "method": "idw",
             "params": {
                 "block_size": 256,
                 "radius_dist": 5.0,

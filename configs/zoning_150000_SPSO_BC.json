@@ -22,7 +22,8 @@
         },
         "formula": {"ref": "D"},
         "interpolation": {
-            "method": "lsm_idw",
+            "method": "idw",
+            "order":"after",
             "params": {
                 "block_size": 256,
                 "radius_dist": 5.0,
@@ -33,6 +34,7 @@
         },
         "classification": {
             "method": "custom_thresholds",
+            "num_classes":4,
             "thresholds": [
             {"min": "","max": 3, "level": 4, "label": "低风险"},    
             {"min": 3, "max": 6, "level": 3, "label": "中风险"},  
@@ -109,6 +111,7 @@
         },
         "interpolation": {
             "method": "lsm_idw",
+            "order":"after",
             "params": {
                 "block_size": 256,
                 "radius_dist": 5.0,
@@ -119,6 +122,7 @@
         },
         "classification": {
             "method": "custom_thresholds",
+            "num_classes":4,
             "thresholds": [
                 {"level": 4, "label": "低发生区", "max": 1.0},
                 {"level": 3, "label": "中发生区", "min": 1.0, "max": 1.5},

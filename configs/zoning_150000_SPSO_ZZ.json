@@ -14,20 +14,12 @@
 
         "indicators": {
             "a": {
-                "type": "conditional_sum",
+                "type": "stable_threshold_accumulation",
                 "start_date": "01-01",
                 "end_date": "12-31",
                 "frequency": "lta",
                 "base_temp": 10,
-                "method": "mean",
-                "variable":"tavg",
-                "conditions": [
-                    {
-                        "variable": "tavg",
-                        "operator": ">=",
-                        "value": 10
-                    }
-                ]
+                "variable":"tavg"
             },
             "b": {
                 "type": "period_sum",
@@ -46,12 +38,7 @@
         },
         "formula": {
             "type": "custom_formula",
-            "formula": "w1 * a_std + w2 * b_std + w3 * c_std",
-            "weight": {
-                "w1": 0.3,
-                "w2": 0.5,
-                "w3": 0.2
-            },
+            "formula": "0.3 * a_std + 0.5 * b_std + 0.2 * c_std",
             "variables": {
                 "a_std": {
                     "type": "standardize",
