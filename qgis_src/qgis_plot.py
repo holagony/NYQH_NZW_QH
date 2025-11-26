@@ -10,9 +10,6 @@ from qgis.core import QgsExpressionContextUtils,QgsCoordinateTransform,QgsLayout
 from osgeo import gdal
 
 
- 
-
-
 def drawmaps(tiffile,pngfile, rasterStyle, template, code, mapinfo):
     # 解决ERROR 6: The PNG driver does not support update access to existing datasets.
     gdal.PushErrorHandler('CPLQuietErrorHandler')

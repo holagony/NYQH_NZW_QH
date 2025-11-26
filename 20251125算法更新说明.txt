@@ -1,0 +1,40 @@
+20251125更新：
+
+算法框架新增功能：
+
+1、indicators新增蒸散发fao_pet、太阳辐射total_radiation、稳定通过XX℃的积温stable_threshold_accumulation，稳定通过温度阈值期间的最大值stable_threshold_extreme（例如稳定通过10℃期间的最大降水量），干燥度指数aridity_index，某段时间范围内的要素的逐日序列daily_sequence。参考zoning_150000_SPSO_CL.json中的设置。
+
+2、对逐日数据的计算和返回，会保存逐日站点计算结果到csv文件，若上一次计算已经生产中间csv文件，则再次计算时直接读取csv文件，节省计算时间。
+
+3、inputjson新增参数，具体包括：
+    "@gridFilePath": "标准格网,存放省级掩膜数据,根据省份areaCode传入对应文件",     
+    "gridFilePath": "***/grid/150000_30grid.tif",
+    "@demFilePath": "DEM高程数据,根据省份areaCode传入对应文件", 
+    "demFilePath": "***/dem/150000_dem.tif",
+    "@shpFilePath": "矢量文件,根据省份areaCode传入对应文件", 
+    "shpFilePath": "***/shp/150000_prov.shp",
+    "@dpamFilePath": "防灾减灾文件",
+    "dpamFilePath": "***/dpam/150000_dpam.tif",
+    "@vulFilePath": "脆弱性文件",
+    "vulFilePath": "***/vulnerability/150000_vulnerability.tif",
+    "@sensFilePath": "敏感性文件",
+    "sensFilePath": "***/dpam/150000_sensitivity.tif",
+    "@landuseFilePath": "土地利用文件",
+    "landuseFilePath": "***/landuse/150000_landuse.tif",
+    "@GDPFilePath": "GDP文件",
+    "GDPFilePath": "***/gdp/150000_GDP.tif",
+    "@cropgainFilePath": "作物收获面积文件", 
+    "cropgainFilePath": "***/cropgain/150000_SPSO_gain.tif",
+    "@photosyntheticParamsPath": "光合生产潜力参数文件", 
+    "photosyntheticParamsPath": "***/photosynthetic_production_potential_parameters.csv",
+    "@growthPeriodPath": "作物生长期及对应的三基点温度、Kc等数值文件", 
+    "growthPeriodPath": "***/growth_period/150000_growth_period.xlsx",
+
+4、算法中增加depend数据的预处理：
+若对应省份的数据不存在，则从全国tif中进行裁剪，若全国tif也不存在，则传递空字符串，
+若对应省份的数据存在，则进行预处理，确保所有栅格数据与参考格网文件在坐标系、范围、分辨率和网格数上完全一致。
+
+5、增加市、县级结果生产，更改areaCode即可生产市、县数据，其他参数仍然传省级数据。
+
+6、画图矢量自动裁剪，从全国省市县000000_prov.shp、000000_prov.shp、000000_prov.shp文件中裁剪出对应省份的画图矢量。
+
