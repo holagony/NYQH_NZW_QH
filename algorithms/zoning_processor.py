@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-简化版区划处理器 - 直接高效的流程
+简化版区划处理器 - 支持逐日数据
 """
 import os
+import shutil
 import sys
 from pathlib import Path
 import numpy as np
@@ -11,7 +12,7 @@ import pandas as pd
 import json
 from datetime import datetime
 import importlib
-from typing import List,Dict,Any
+from typing import List,Dict,Any,Optional,Tuple
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
@@ -19,6 +20,7 @@ sys.path.append(str(project_root))
 
 from .data_manager import DataManager
 from configs.base_config import BaseConfig
+from .preprocess import DataPreprocessor
 
 class ZoningProcessor:
     """区划处理器"""
@@ -27,31 +29,35 @@ class ZoningProcessor:
         self.config = config
         self.fjson = fjson
         self.rjson = rjson
+
+        # 初始化配置管理器 - 使用绝对路径
+        configs_dir = Path(__file__).parent.parent / "configs"
+        self.config_manager = BaseConfig(str(configs_dir))        
         
-        # 初始化配置管理器
-        self.config_manager = BaseConfig("configs")
+        # 初始化数据预处理器并执行预处理
+        self.preprocessor = DataPreprocessor(config, fjson, rjson)
+        
+        # # 检查依赖文件存在性
+        # self.preprocessor.check_depend_files_existence()
+        
+        # 执行数据预处理
+        if not self.preprocessor.preprocess_depend_data():
+            raise Exception("依赖数据预处理失败")
+        
+        # # 再次检查预处理后的文件存在性
+        # self.preprocessor.check_depend_files_existence()
         
         # 初始化参数
-        self._init_parameters()
+        self.area_code = self.config["areaCode"]  # 原始区域编码
         
-        # 初始化数据管理器
-        self.data_manager =DataManager(config['inputFilePath'],
-                    station_file=config.get('stationFilePath'),
-                    multiprocess=config.get('multiprocess', True),
-                    num_processes=config.get('num_processes',16)
-                    )
-        # 插值和分类方法初始化
-        self._algorithms = self._load_algorithms()
+        # 新增：计算省级编码和区域名称
+        self.province_code, self.area_name = self._get_province_code_and_name()
         
-    def _init_parameters(self):
-        """初始化参数"""
-        self.area_code = self.config["areaCode"]
-        self.area_name = self.config["areaName"]
         self.crop_code = self.config["cropCode"]
         self.zoning_type = self.config["zoningType"]
         self.element = self.config.get("element", "")
 
-        # 新增：算法来源参数，用于控制算法模块和配置文件
+        # 算法来源参数
         self.algo_from = self.config.get("algoFrom", "")
 
         # 时间参数
@@ -60,14 +66,9 @@ class ZoningProcessor:
         
         # 根据 algoFrom 确定配置键
         if self.algo_from:
-            # 使用 algoFrom 指定的算法配置
             config_key = self.algo_from
         else:
-            # 使用默认的区域-作物-区划类型配置
-            # config_key = f"zoning_{self.area_code}_{self.crop_code}_{self.zoning_type}"
-            # config_key = "zoning_general_calculator"
             config_key = f"zoning_{self.area_code}_{self.crop_code}_{self.zoning_type}"
-        # self.fjson.log(f"使用参数配置: {config_key}")
         
         # 合并配置
         user_algorithm_config = self.config.get('algorithmConfig')
@@ -75,11 +76,6 @@ class ZoningProcessor:
             user_algorithm_config, config_key, self.crop_code, self.zoning_type
         )
         
-        # # 合并配置
-        # user_algorithm_config = self.config.get('algorithmConfig')
-        # self.algorithm_config = self.config_manager.merge_configs(
-        #     user_algorithm_config, self.area_code, self.crop_code, self.zoning_type
-        # )
         # 获取指标配置
         if self.element:
             self.algorithm_config = self.algorithm_config[self.element]
@@ -91,40 +87,133 @@ class ZoningProcessor:
         # 文件路径
         self.result_path = self.config.get("resultPath", "./results")
         Path(self.result_path).mkdir(parents=True, exist_ok=True)
-    
+
         # 设置中间结果输出路径
         intermediate_dir = Path(self.result_path) / "intermediate"
         intermediate_dir.mkdir(parents=True, exist_ok=True)
         self.intermediate_output = intermediate_dir / intermediate_filename
+                
+        # 初始化数据管理器
+        self.data_manager = DataManager(config['inputFilePath'],
+                    station_file=config.get('stationFilePath'),
+                    multiprocess=config.get('multiprocess', True),
+                    num_processes=config.get('num_processes',16)
+                    )
+        # 插值和分类方法初始化
+        self._algorithms = self._load_algorithms()
         
-        # self.fjson.log(f"配置加载完成")
+
+    # def _init_parameters(self):
+    #     """初始化参数"""
+    #     self.area_code = self.config["areaCode"]
+        
+    #     # 新增：从行政区划编码文件获取区域名称
+    #     self.area_name = self._get_area_name_from_admin_code()
+        
+    #     self.crop_code = self.config["cropCode"]
+    #     self.zoning_type = self.config["zoningType"]
+    #     self.element = self.config.get("element", "")
+
+    #     # 新增：算法来源参数，用于控制算法模块和配置文件
+    #     self.algo_from = self.config.get("algoFrom", "")
+
+    #     # 时间参数
+    #     self.start_date = self.config.get("startDate", "19910101")
+    #     self.end_date = self.config.get("endDate", "20201231")
+        
+  
+    #     # 根据 algoFrom 确定配置键
+    #     if self.algo_from:
+    #         # 使用 algoFrom 指定的算法配置
+    #         config_key = self.algo_from
+    #     else:
+    #         # 使用默认的区域-作物-区划类型配置
+    #         # config_key = f"zoning_{self.area_code}_{self.crop_code}_{self.zoning_type}"
+    #         # config_key = "zoning_general_calculator"
+    #         config_key = f"zoning_{self.area_code}_{self.crop_code}_{self.zoning_type}"
+    #     # self.fjson.log(f"使用参数配置: {config_key}")
+        
+    #     # 合并配置
+    #     user_algorithm_config = self.config.get('algorithmConfig')
+    #     self.algorithm_config = self.config_manager.merge_configs(
+    #         user_algorithm_config, config_key, self.crop_code, self.zoning_type
+    #     )
+        
+    #     # 获取指标配置
+    #     if self.element:
+    #         self.algorithm_config = self.algorithm_config[self.element]
+    #         intermediate_filename = "intermediate_"+self.crop_code+"_"+self.element+".csv"
+    #     else:
+    #         intermediate_filename = "intermediate"+self.crop_code+".csv"
+
+    #     self.indicator_configs = self.algorithm_config.get("indicators")
+    #     # 文件路径
+    #     self.result_path = self.config.get("resultPath", "./results")
+    #     Path(self.result_path).mkdir(parents=True, exist_ok=True)
     
+    #     # 设置中间结果输出路径
+    #     intermediate_dir = Path(self.result_path) / "intermediate"
+    #     intermediate_dir.mkdir(parents=True, exist_ok=True)
+    #     self.intermediate_output = intermediate_dir / intermediate_filename   
+        
+    #     # self.fjson.log(f"配置加载完成")
+
     def process(self):
-        """执行简化的区划处理流程"""
+        """执行简化的区划处理流程 - 支持逐日数据"""
         try:
             self.fjson.log("获取站点信息")
             
-            # 1. 获取站点列表
-            station_ids = self.data_manager.get_stations_by_province(self.area_code)
-            self.fjson.log(f"找到 {len(station_ids)} 个站点")
+            # 1. 获取站点列表 - 使用省级编码获取站点
+            station_ids = self.data_manager.get_stations_by_province(self.province_code)
+            self.fjson.log(f"找到 {len(station_ids)} 个站点，使用省级编码: {self.province_code}")
             
             # 2. 批量计算指标
+            # 检查是否有daily频率的指标
+            has_daily_indicators = any(
+                config.get("frequency") == "daily" 
+                for config in self.indicator_configs.values()
+            )
             
-            # 计算所有站点的指标值
             if not os.path.exists(self.intermediate_output):
-                self.data_manager.calculate_indicators_for_stations(
+                # 计算指标，返回常规结果和逐日结果
+                station_indicators_df, daily_indicators_df = self.data_manager.calculate_indicators_for_stations(
                     station_ids, self.indicator_configs, self.start_date, self.end_date, self.intermediate_output
                 )
-
-            self.fjson.info("指标计算完成")     
-            # 读取站点数据
-            station_indicators, station_coords = self._prepare_station_data(self.intermediate_output, self.indicator_configs)
-
-            # 3. 执行区划计算
-            zoning_result = self._execute_zoning_calculation(station_indicators,station_coords)
-            self.fjson.info("区划计算完成") 
-            # 4. 保存结果
+                
+                # 如果有逐日数据，记录信息
+                if daily_indicators_df is not None and not daily_indicators_df.empty:
+                    self.fjson.log(f"生成逐日数据，包含 {len(daily_indicators_df)} 条记录")
+            else:
+                # 读取已有的结果
+                station_indicators_df = pd.read_csv(self.intermediate_output)
+                daily_indicators_df = None
+                
+                # 尝试读取逐日数据文件
+                daily_output_path = Path(self.intermediate_output).with_name(f"daily_{Path(self.intermediate_output).name}")
+                if daily_output_path.exists():
+                    try:
+                        daily_indicators_df = pd.read_csv(daily_output_path, encoding='gbk')
+                    except:
+                        daily_indicators_df = pd.read_csv(daily_output_path, encoding='utf-8')
+                    self.fjson.log(f"读取逐日数据，包含 {len(daily_indicators_df)} 条记录")
             
+            self.fjson.info("指标计算完成")     
+            
+            # 3. 准备站点数据
+            # 如果有daily指标且需要传入区划计算，则使用daily数据
+            if has_daily_indicators and daily_indicators_df is not None and not daily_indicators_df.empty:
+                self.fjson.log("使用逐日数据进行区划计算")
+                station_indicators = daily_indicators_df
+                station_coords = self._prepare_station_coords_from_daily(daily_indicators_df)
+            else:
+                self.fjson.log("使用逐年或多年数据进行区划计算")
+                station_indicators, station_coords = self._prepare_station_data(self.intermediate_output, self.indicator_configs)
+          
+            # 4. 执行区划计算
+            zoning_result = self._execute_zoning_calculation(station_indicators, station_coords)
+            self.fjson.info("区划计算完成") 
+            
+            # 5. 保存结果
             self._save_results(zoning_result)
             self.fjson.info("结果输出完成")
             
@@ -136,8 +225,23 @@ class ZoningProcessor:
             self.fjson.log(f"详细错误: {traceback.format_exc()}")
             return False
 
+    def _prepare_station_coords_from_daily(self, daily_df: pd.DataFrame) -> Dict[str, Any]:
+        """从逐日数据中提取站点坐标信息"""
+        station_coords = {}
+        
+        # 按站点分组，获取每个站点的坐标信息
+        for station_id, group in daily_df.groupby('station_id'):
+            first_row = group.iloc[0]
+            station_coords[station_id] = {
+                'lat': float(first_row.get('lat', np.nan)),
+                'lon': float(first_row.get('lon', np.nan)),
+                'altitude': float(first_row.get('altitude', np.nan))
+            }
+        
+        return station_coords
+
     def _prepare_station_data(self, station_indicators_df, indicator_configs):
-        """准备站点数据 - 适配 yearly 和 lta 数据类型"""
+        """准备站点数据 - 适配 yearly、lta 和 daily 数据类型"""
         try:
             # 读取CSV文件
             station_indicators_df = pd.read_csv(station_indicators_df, dtype=str, encoding="gbk")
@@ -146,17 +250,22 @@ class ZoningProcessor:
         
         print("准备站点数据...")
         
+        # 检查是否是逐日数据的DataFrame格式
+        if 'datetime' in station_indicators_df.columns:
+            # 这是逐日数据格式，直接返回DataFrame
+            self.fjson.log("检测到逐日数据格式")
+            station_coords = self._prepare_station_coords_from_daily(station_indicators_df)
+            return station_indicators_df, station_coords
+        
+        # 原有的处理逻辑（用于yearly和lta数据）
         # 使用配置中的指标名称
         indicator_names = list(indicator_configs.keys())
-        # print(f"期望的指标名称: {indicator_names}")
         
         # 检查DataFrame中实际存在的列
         actual_columns = set(station_indicators_df.columns)
-        # print(f"DataFrame中的列: {list(actual_columns)}")
         
         # 找出匹配的指标列
         matched_indicators = [col for col in indicator_names if col in actual_columns]
-        # print(f"匹配的指标列: {matched_indicators}")
         
         # 排除的列（坐标信息和元数据）
         exclude_columns = ['station_id', 'lat', 'lon', 'altitude', 'province', 'city', 'county', 'error', 'station_name']
@@ -191,7 +300,6 @@ class ZoningProcessor:
                 except (ValueError, TypeError):
                     # 如果不是数值，尝试解析为字典（yearly数据）
                     try:
-                        # 假设格式为："{1991: 5.2, 1992: 6.8}" 或 JSON 格式
                         if value.startswith('{') and value.endswith('}'):
                             # 简单的字典格式解析
                             dict_str = value.strip('{}')
@@ -243,32 +351,18 @@ class ZoningProcessor:
         
         print(f"成功准备 {valid_stations}/{len(station_indicators)} 个站点的有效数据")
         
-        # # 打印数据类型统计
-        # if yearly_indicators:
-        #     print("逐年数据指标统计:")
-        #     for indicator, count in yearly_indicators.items():
-        #         print(f"  {indicator}: {count} 个站点")
-        
-        # if lta_indicators:
-        #     print("多年平均数据指标统计:")
-        #     for indicator, count in lta_indicators.items():
-        #         print(f"  {indicator}: {count} 个站点")
-        
         return station_indicators, station_coords
 
-    def _execute_zoning_calculation(self, indicators_data: Dict[str, Any], station_coords: Dict[str, Any]) -> Dict[str, Any]:
-        """ 支持跨区域算法调用"""
+    def _execute_zoning_calculation(self, station_indicators: Any, station_coords: Dict[str, Any]) -> Dict[str, Any]:
+        """执行区划计算 - 支持DataFrame格式的逐日数据"""
         
         # 根据 algoFrom 确定计算器名称
         if self.algo_from:
             calculator_name = self.algo_from
-            # 计算器类名
             class_name = f"{self.crop_code}_{self.zoning_type}"
             self.fjson.log(f"使用配置算法: {calculator_name}")
         else:
-            # calculator_name = f"zoning_{self.area_code}_{self.crop_code}_{self.zoning_type}"
             calculator_name = "zoning_general_calculator"
-            # 计算器类名
             class_name = "GenericZoningCalculator"
             self.fjson.log(f"使用默认算法: {calculator_name}")
         
@@ -284,16 +378,31 @@ class ZoningProcessor:
                 calculator_class = getattr(module, class_name)
                 self.fjson.log(f"找到计算器类: {calculator_class}")
                 
-                # 准备计算参数
+                # 准备计算参数 - 包含所有可能的依赖文件路径
                 calc_params = {
-                    'station_indicators': indicators_data,
+                    'station_indicators': station_indicators,
                     'station_coords': station_coords,
                     'algorithmConfig': self.algorithm_config,
                     'algorithms': self._algorithms,
-                    'config': self.config
+                    'config': self.config,
+                    # 可选依赖文件路径
+                    'dpamFilePath': self.config.get('dpamFilePath', ''),
+                    'vulFilePath': self.config.get('vulFilePath', ''),
+                    'sensFilePath': self.config.get('sensFilePath', ''),
+                    'landuseFilePath': self.config.get('landuseFilePath', ''),
+                    'GDPFilePath': self.config.get('GDPFilePath', ''),
+                    'cropgainFilePath': self.config.get('cropgainFilePath', ''),
+                    'photosyntheticParamsPath': self.config.get('photosyntheticParamsPath', ''),
+                    'growthPeriodPath': self.config.get('growthPeriodPath', '')
                 }
                 
-                # self.fjson.log(f"调用计算器参数: {list(calc_params.keys())}")
+                # 如果是DataFrame格式，添加标记
+                if isinstance(station_indicators, pd.DataFrame):
+                    calc_params['data_type'] = 'daily'
+                    self.fjson.log("传入逐日DataFrame数据到区划计算器")
+                else:
+                    calc_params['data_type'] = 'station'
+                    self.fjson.log("传入逐年或多年站点数据到区划计算器")
                 
                 # 执行计算
                 calculator_instance = calculator_class()
@@ -306,26 +415,33 @@ class ZoningProcessor:
                 raise AttributeError(f"类 {class_name} 不存在")
                 
         except ImportError as e:
-            # self.fjson.log(f"专用计算器导入失败: {str(e)}")
             self.fjson.log("尝试使用通用计算器")
-            return self._fallback_to_generic_calculator(indicators_data, station_coords)
+            return self._fallback_to_generic_calculator(station_indicators, station_coords)
             
         except Exception as e:
             self.fjson.log(f"计算器执行异常: {str(e)}")
             raise
 
-    def _fallback_to_generic_calculator(self, indicators_data: Dict[str, Any], station_coords: Dict[str, Any]) -> Dict[str, Any]:
-        """通用算法"""
+    def _fallback_to_generic_calculator(self, station_indicators: Any, station_coords: Dict[str, Any]) -> Dict[str, Any]:
+        """通用算法 - 支持DataFrame格式"""
         try:
             from algorithms.zoning_calculator.zoning_general_calculator import GenericZoningCalculator
             
             calc_params = {
-                'station_indicators': indicators_data,
+                'station_indicators': station_indicators,
                 'station_coords': station_coords,
                 'grid_path': self.config['gridFilePath'],
                 'dem_path': self.config.get('demFilePath'),
                 'algorithmConfig': self.algorithm_config
             }
+            
+            # 如果是DataFrame格式，添加标记
+            if isinstance(station_indicators, pd.DataFrame):
+                calc_params['data_type'] = 'daily'
+                self.fjson.log("通用计算器处理逐日DataFrame数据")
+            else:
+                calc_params['data_type'] = 'station'
+                self.fjson.log("通用计算器处理常规站点数据")
             
             calculator = GenericZoningCalculator()
             result = calculator.calculate(calc_params)
@@ -335,19 +451,58 @@ class ZoningProcessor:
         except Exception as e:
             self.fjson.log(f"通用计算器也失败: {str(e)}")
             raise
-           
-      
+
+
+    # def _save_results(self, zoning_result: Dict[str, Any]):
+    #     """保存结果 - 使用GDAL直接裁剪市县级数据"""
+    #     # 生成输出文件名
+    #     tif_filename = self._generate_output_filename("tif")
+    #     tif_path = os.path.join(self.result_path, tif_filename)
+        
+    #     # 保存TIFF文件
+    #     self._save_geotiff(zoning_result['data'], zoning_result['meta'], tif_path, 0)
+        
+    #     from algorithms.common_tool.raster_tool import RasterTool
+    #     RasterTool.maskRasterByRaster(tif_path, self.config['gridFilePath'], tif_path,
+    #                                 mask_nodata=0, dst_nodata=0, srs_nodata=0)
+        
+    #     # 如果是市县级区域，使用GDAL直接裁剪结果
+    #     temp_shp_path = self.config.get('tempShpFilePath')
+    #     if temp_shp_path and Path(temp_shp_path).exists():
+    #         tif_path = DataPreprocessor.clip_raster_to_region(tif_path, temp_shp_path, self.area_code)
+        
+    #     # 写入结果到rjson
+    #     if tif_path:
+    #         self.rjson.info("result", [tif_path, "NYQH_NZW", "农作物气候区划", "QH", "TIFF"])
+                
+    #     # 生成PNG专题图
+    #     png_filename = self._generate_output_filename("png")
+    #     png_path = os.path.join(self.result_path, png_filename)
+        
+    #     # 准备QGIS矢量文件并生成专题图
+    #     self.preprocessor.prepare_qgis_shp_files()
+    #     self._generate_qgis_map(tif_path, png_path)
+    #     self.fjson.log(f"专题图已生成: {png_path}")
+
+    #     if png_path:
+    #         self.rjson.info("result", [png_path, "NYQH_NZW", "农作物气候区划专题图", "QH", "PNG"])
+
+             
     def _save_results(self, zoning_result: Dict[str, Any]):
-        """保存结果"""
+        """保存结果 - 使用GDAL直接裁剪市县级数据"""
         # 生成输出文件名
         tif_filename = self._generate_output_filename("tif")
         tif_path = os.path.join(self.result_path, tif_filename)
         
         # 保存TIFF文件
-        self._save_geotiff(zoning_result['data'], zoning_result['meta'], tif_path,0)
-        from algorithms.common_tool.raster_tool import RasterTool
-        RasterTool.maskRasterByRaster(tif_path,self.config['gridFilePath'],tif_path,\
-                                    mask_nodata=0,dst_nodata=0,srs_nodata=0)
+        self._save_geotiff(zoning_result['data'], zoning_result['meta'], tif_path, 0)
+        
+        self.preprocessor.maskRasterByRaster(tif_path, self.config['gridFilePath'], tif_path,
+                                    mask_nodata=0, dst_nodata=0, srs_nodata=0)
+        
+        # 如果是市县级区域，使用GDAL直接裁剪结果
+        if not self.area_code.endswith('0000'):
+            tif_path = self.preprocessor._clip_raster_to_region(tif_path, self.area_code)
         
         # 写入结果到rjson
         if tif_path:
@@ -357,41 +512,14 @@ class ZoningProcessor:
         png_filename = self._generate_output_filename("png")
         png_path = os.path.join(self.result_path, png_filename)
         
-        # 调用QGIS生成专题图
+        # 准备QGIS矢量文件并生成专题图
+        self.preprocessor.prepare_qgis_shp_files()
         self._generate_qgis_map(tif_path, png_path)
         self.fjson.log(f"专题图已生成: {png_path}")
 
         if png_path:
-            self.rjson.info("result", [png_path, "NYQH_NZW", "农作物气候区划专题图", "QH", "PNG"])        
-        # # 保存结果信息
-        # result_info = {
-        #     'task_id': self.config.get('taskId', ''),
-        #     'area_code': self.area_code,
-        #     'area_name': self.area_name,
-        #     'crop_code': self.crop_code,
-        #     'zoning_type': self.zoning_type,
-        #     'element': self.element,
-        #     'start_date': self.start_date,
-        #     'end_date': self.end_date,
-        #     'output_files': {
-        #         'tif': tif_path,
-        #         'png': png_path
-        #     },
-        #     'timestamp': datetime.now().isoformat()
-        # }
+            self.rjson.info("result", [png_path, "NYQH_NZW", "农作物气候区划专题图", "QH", "PNG"])
         
-        # 保存JSON文件
-        # json_filename = self._generate_output_filename("json")
-        # json_path = os.path.join(self.result_path, json_filename)
-        # with open(json_path, 'w', encoding='utf-8') as f:
-        #     json.dump(result_info, f, ensure_ascii=False, indent=2)
-        
-        # 记录结果
-        # self.rjson.info('output_files', [tif_path, png_path, json_path])
-        # self.rjson.info('processing_time', datetime.now().isoformat())
-        
-        # self.fjson.log(f"结果已保存: {tif_path}, {png_path}, {json_path}")
-    
     def _generate_output_filename(self, file_type: str) -> str:
         """生成输出文件名"""
         crop_code = self.crop_code.upper()[:4]
@@ -433,6 +561,73 @@ class ZoningProcessor:
         #     "high_temperature": "201"
         # }
         return factor_code
+
+    def _get_province_code_and_name(self) -> Tuple[str, str]:
+        """获取省级编码和区域名称"""
+        area_code = self.area_code
+        admin_code_file = self.config.get("adminCodeFile")
+        
+        # 如果没有提供行政区划编码文件，使用简单逻辑
+        if not admin_code_file:
+            return self._get_province_code_and_name_fallback(area_code)
+        
+        try:
+            # 读取行政区划编码文件
+            admin_df = pd.read_csv(admin_code_file, dtype=str, encoding='utf-8')
+        except:
+            try:
+                admin_df = pd.read_csv(admin_code_file, dtype=str, encoding='gbk')
+            except Exception as e:
+                self.fjson.log(f"无法读取行政区划编码文件: {str(e)}，使用备用逻辑")
+                return self._get_province_code_and_name_fallback(area_code)
+        
+        # 根据areaCode长度和格式判断区域级别
+        if len(area_code) == 6:
+            if area_code.endswith('0000'):  # 省级
+                # 匹配省代码
+                province_match = admin_df[admin_df['省代码'] == area_code]
+                if not province_match.empty:
+                    province_name = province_match.iloc[0]['省']
+                    return area_code, province_name
+            elif area_code.endswith('00'):  # 市级
+                # 匹配市代码
+                city_match = admin_df[admin_df['市代码'] == area_code]
+                if not city_match.empty:
+                    city_row = city_match.iloc[0]
+                    province_code = city_row['省代码']
+                    province_name = city_row['省']
+                    city_name = city_row['市']
+                    area_name = f"{province_name}{city_name}"
+                    return province_code, area_name
+            else:  # 县级
+                # 匹配PAC（县级编码）
+                county_match = admin_df[admin_df['PAC'] == area_code]
+                if not county_match.empty:
+                    county_row = county_match.iloc[0]
+                    province_code = county_row['省代码']
+                    province_name = county_row['省']
+                    city_name = county_row['市']
+                    county_name = county_row['县']
+                    area_name = f"{province_name}{city_name}{county_name}"
+                    return province_code, area_name
+        
+        # 如果没有匹配到，使用备用逻辑
+        self.fjson.log(f"在行政区划编码文件中未找到匹配的区域代码: {area_code}，使用备用逻辑")
+        return self._get_province_code_and_name_fallback(area_code)
+
+    def _get_province_code_and_name_fallback(self, area_code: str) -> Tuple[str, str]:
+        """备用逻辑：当无法从行政区划编码文件获取时使用"""
+        # 如果是省级编码，直接使用
+        if len(area_code) == 6 and area_code.endswith('0000'):
+            return area_code, self.config["areaName"]
+        
+        # 如果是市级或县级编码，提取省级部分
+        if len(area_code) == 6:
+            province_code = area_code[:2] + "0000"
+            return province_code, self.config["areaName"]
+        
+        # 其他情况，直接使用原编码和名称
+        return area_code, self.config["areaName"]
     
     def _save_geotiff(self, data: np.ndarray, meta: Dict, output_path: str,nodata=0):
         """保存GeoTIFF文件"""

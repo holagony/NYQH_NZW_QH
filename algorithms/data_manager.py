@@ -9,10 +9,10 @@ import multiprocessing
 from datetime import datetime, timedelta
 from tqdm import tqdm
 from .indicators import IndicatorCalculator
-# import logging
 
 class DataManager:
-    """数据管理类 - 完整版本"""
+    """数据管理类 - 支持逐日数据输出"""
+    
     def __init__(self, data_dir: str, station_file: str = None, multiprocess: bool = True, num_processes: int = 8):
         self.data_dir = Path(data_dir)
         self.station_file = Path(station_file) if station_file else None
@@ -43,28 +43,276 @@ class DataManager:
         if self.station_file and self.station_file.exists():
             self._load_station_info()
     
-
     def calculate_indicators_for_stations(self, station_ids: List[str], indicator_configs: Dict[str, Any],
                                         start_date: str = None, end_date: str = None,
-                                        output_csv: str = None) -> pd.DataFrame:
-        """计算多个站点的多个指标 - 支持中间CSV输出"""
-        # print(f"开始计算 {len(station_ids)} 个站点的指标")
+                                        output_csv: str = None) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+        """计算多个站点的多个指标 - 返回常规结果和逐日结果"""
+        print(f"开始计算 {len(station_ids)} 个站点的指标")
         print(f"指标配置: {list(indicator_configs.keys())}")
         
-        results_df = self.calculate_indicators_for_stations_optimized(
-            station_ids, indicator_configs, start_date, end_date, output_csv
+        # 检查是否有daily频率的指标
+        has_daily_indicators = any(
+            config.get("frequency") == "daily" 
+            for config in indicator_configs.values()
         )
         
-        # 如果指定了输出CSV路径，保存中间结果
+        if self.multiprocess:
+            results_df, daily_results_df = self._calculate_parallel_optimized(
+                station_ids, indicator_configs, start_date, end_date, output_csv, has_daily_indicators
+            )
+        else:
+            results_df, daily_results_df = self._calculate_sequential_optimized(
+                station_ids, indicator_configs, start_date, end_date, output_csv, has_daily_indicators
+            )
+        
+        # 保存常规结果
         if output_csv and not results_df.empty:
             self._save_intermediate_csv(results_df, output_csv, indicator_configs)
         
+        # 保存逐日结果
+        if has_daily_indicators and daily_results_df is not None and not daily_results_df.empty:
+            daily_output_csv = str(Path(output_csv).with_name(f"daily_{Path(output_csv).name}"))
+            self._save_daily_results(daily_results_df, daily_output_csv)
+        
         # 检查结果
         if not results_df.empty:
-            # 打印统计信息
             self._print_indicator_stats(results_df, indicator_configs)
+        
+        if daily_results_df is not None and not daily_results_df.empty:
+            print(f"逐日数据包含 {len(daily_results_df)} 条记录，时间范围: {daily_results_df['datetime'].min()} 到 {daily_results_df['datetime'].max()}")
     
-        return results_df
+        return results_df, daily_results_df
+
+    def _save_daily_results(self, daily_df: pd.DataFrame, output_csv: str) -> None:
+        """保存逐日结果到CSV"""
+        try:
+            output_path = Path(output_csv)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 确保列的顺序
+            base_columns = ['station_id', 'lat', 'lon', 'altitude', 'province', 'city', 'county', 'datetime']
+            other_columns = [col for col in daily_df.columns if col not in base_columns]
+            ordered_columns = base_columns + other_columns
+            
+            # 只保存存在的列
+            existing_columns = [col for col in ordered_columns if col in daily_df.columns]
+            daily_df_to_save = daily_df[existing_columns]
+            
+            # 保存为CSV
+            daily_df_to_save.to_csv(output_path, encoding='gbk', index=False)
+            print(f"逐日结果已保存到: {output_path}")
+            
+        except Exception as e:
+            print(f"保存逐日结果失败: {str(e)}")
+            # 尝试UTF-8编码
+            try:
+                daily_df_to_save.to_csv(output_path, encoding='utf-8', index=False)
+                print(f"逐日结果已保存到: {output_path} (使用UTF-8编码)")
+            except Exception as e2:
+                print(f"保存逐日结果最终失败: {str(e2)}")
+
+    def _calculate_parallel_optimized(self, station_ids, indicator_configs, start_date, end_date, output_csv, has_daily_indicators):
+        """优化的并行计算 - 返回常规结果和逐日结果"""
+        print(f"使用多进程计算，进程数: {self.num_processes}")
+        start_time = time.time()
+        
+        results_df = pd.DataFrame()
+        daily_results_list = []
+        
+        import multiprocessing as mp
+        from multiprocessing import Pool
+        
+        try:
+            with Pool(processes=self.num_processes) as pool:
+                # 准备任务
+                tasks = [(station_id, indicator_configs, start_date, end_date, has_daily_indicators) 
+                        for station_id in station_ids]
+                
+                # 使用imap_unordered提高性能
+                results = list(tqdm(
+                    pool.imap_unordered(self._station_worker_optimized, tasks),
+                    total=len(station_ids),
+                    desc="计算站点指标"
+                ))
+            
+            # 分离常规结果和逐日结果
+            valid_results = []
+            for r in results:
+                if r and 'error' not in r or r.get('error') is None:
+                    # 分离逐日数据
+                    if '_daily_data' in r:
+                        daily_results_list.append(r['_daily_data'])
+                        del r['_daily_data']
+                    valid_results.append(r)
+            
+            error_results = [r for r in results if r and 'error' in r and r['error'] is not None]
+            
+            if valid_results:
+                results_df = pd.DataFrame(valid_results)
+            
+            # 合并逐日数据
+            if daily_results_list:
+                daily_results_df = pd.concat(daily_results_list, ignore_index=True)
+            else:
+                daily_results_df = pd.DataFrame()
+                
+            if error_results:
+                error_df = pd.DataFrame(error_results)
+                print(f"有 {len(error_results)} 个站点计算失败")
+            
+        except Exception as e:
+            print(f"多进程计算失败: {str(e)}，回退到单进程")
+            return self._calculate_sequential_optimized(station_ids, indicator_configs, start_date, end_date, output_csv, has_daily_indicators)
+        
+        end_time = time.time()
+        print(f'多进程计算完成，耗时 {end_time - start_time:.2f} 秒，成功: {len(valid_results)}/{len(station_ids)}')
+        
+        # 保存结果
+        if output_csv and not results_df.empty:
+            self._save_results_optimized(results_df, output_csv)
+        
+        return results_df, daily_results_df
+
+    def _calculate_sequential_optimized(self, station_ids, indicator_configs, start_date, end_date, output_csv, has_daily_indicators):
+        """优化的顺序计算 - 返回常规结果和逐日结果"""
+        print("使用优化的单进程计算")
+        start_time = time.time()
+        
+        results = []
+        daily_results_list = []
+        
+        for station_id in tqdm(station_ids, desc="计算站点指标"):
+            try:
+                result = self._station_worker_optimized((station_id, indicator_configs, start_date, end_date, has_daily_indicators))
+                if result:
+                    # 分离逐日数据
+                    if '_daily_data' in result:
+                        daily_results_list.append(result['_daily_data'])
+                        del result['_daily_data']
+                    results.append(result)
+            except Exception as e:
+                print(f"站点 {station_id} 计算异常: {str(e)}")
+                results.append({"station_id": station_id, "error": str(e)})
+        
+        # 批量创建DataFrame
+        if results:
+            results_df = pd.DataFrame(results)
+        else:
+            results_df = pd.DataFrame()
+        
+        # 合并逐日数据
+        if daily_results_list:
+            daily_results_df = pd.concat(daily_results_list, ignore_index=True)
+        else:
+            daily_results_df = pd.DataFrame()
+        
+        # 统计成功和失败
+        success_count = len([r for r in results if 'error' not in r or not r.get('error')])
+        error_count = len(results) - success_count
+        
+        end_time = time.time()
+        print(f'单进程计算完成，耗时 {end_time - start_time:.2f} 秒，成功: {success_count}/{len(station_ids)}')
+        
+        # 保存结果
+        if output_csv and not results_df.empty:
+            self._save_results_optimized(results_df, output_csv)
+        
+        return results_df, daily_results_df
+
+    def _station_worker_optimized(self, args):
+        """优化的工作函数 - 支持逐日数据"""
+        station_id, indicator_configs, start_date, end_date, has_daily_indicators = args
+        try:
+            # 加载站点数据
+            data = self.load_station_data(station_id, start_date, end_date)
+            if data.empty:
+                return {"station_id": station_id, "error": "无数据"}
+            
+            station_results = {"station_id": station_id}
+            daily_data_list = []
+            
+            # 获取站点信息
+            station_info = self.get_station_info(station_id)
+            station_results.update(station_info)
+            
+            # 计算每个指标
+            for indicator_name, indicator_config in indicator_configs.items():
+                try:
+                    value = self.indicator_calculator.calculate(data, indicator_config)
+                    
+                    # 处理逐日数据
+                    if (has_daily_indicators and 
+                        indicator_config.get("frequency") == "daily" and 
+                        isinstance(value, pd.DataFrame) and 
+                        not value.empty):
+                        
+                        # 为逐日数据添加站点信息
+                        daily_df = value.copy()
+                        daily_df['station_id'] = station_id
+                        for info_key in ['lat', 'lon', 'altitude', 'province', 'city', 'county']:
+                            if info_key in station_info:
+                                daily_df[info_key] = station_info[info_key]
+                        
+                        daily_data_list.append(daily_df)
+                        
+                        # 对于daily指标，也计算一个汇总值用于常规结果
+                        if len(daily_df) > 0:
+                            # 取第一个数值列的平均值作为汇总
+                            value_columns = [col for col in daily_df.columns if col not in 
+                                           ['station_id', 'lat', 'lon', 'altitude', 'province', 'city', 'county', 'datetime']]
+                            if value_columns:
+                                summary_value = daily_df[value_columns[0]].mean()
+                                station_results[indicator_name] = summary_value
+                            else:
+                                station_results[indicator_name] = np.nan
+                        else:
+                            station_results[indicator_name] = np.nan
+                    else:
+                        # 常规指标
+                        station_results[indicator_name] = value
+                        
+                except Exception as e:
+                    print(f"站点 {station_id} 指标 {indicator_name} 计算失败: {str(e)}")
+                    station_results[indicator_name] = np.nan
+            
+            # 合并所有逐日数据
+            if daily_data_list:
+                # 按datetime合并所有逐日指标
+                from functools import reduce
+                merged_daily = reduce(lambda left, right: pd.merge(left, right, 
+                                                                  on=['station_id', 'lat', 'lon', 'altitude', 'province', 'city', 'county', 'datetime'], 
+                                                                  how='outer'), daily_data_list)
+                station_results['_daily_data'] = merged_daily
+            
+            return station_results
+        except Exception as e:
+            print(f"计算站点 {station_id} 失败: {str(e)}")
+            return {"station_id": station_id, "error": str(e)}
+    
+    # 其他方法保持不变...
+
+
+    # def calculate_indicators_for_stations(self, station_ids: List[str], indicator_configs: Dict[str, Any],
+    #                                     start_date: str = None, end_date: str = None,
+    #                                     output_csv: str = None) -> pd.DataFrame:
+    #     """计算多个站点的多个指标 - 支持中间CSV输出"""
+    #     # print(f"开始计算 {len(station_ids)} 个站点的指标")
+    #     print(f"指标配置: {list(indicator_configs.keys())}")
+        
+    #     results_df = self.calculate_indicators_for_stations_optimized(
+    #         station_ids, indicator_configs, start_date, end_date, output_csv
+    #     )
+        
+    #     # 如果指定了输出CSV路径，保存中间结果
+    #     if output_csv and not results_df.empty:
+    #         self._save_intermediate_csv(results_df, output_csv, indicator_configs)
+        
+    #     # 检查结果
+    #     if not results_df.empty:
+    #         # 打印统计信息
+    #         self._print_indicator_stats(results_df, indicator_configs)
+    
+    #     return results_df
     
     def _save_intermediate_csv(self, results_df: pd.DataFrame, output_csv: str, 
                              indicator_configs: Dict[str, Any]) -> None:
@@ -89,39 +337,6 @@ class DataManager:
         except Exception as e:
             print(f"保存中间CSV结果失败: {str(e)}")
     
-    # def _print_indicator_stats(self, results_df: pd.DataFrame, indicator_configs: Dict[str, Any]) -> None:
-    #     """打印指标统计信息"""
-    #     indicator_names = list(indicator_configs.keys())
-        
-    #     print("指标计算结果统计:")
-    #     for indicator in indicator_names:
-    #         if indicator in results_df.columns:
-    #             values = results_df[indicator]
-    #             # valid_values = values.dropna()
-
-    #             # 处理不同类型的数据
-    #             valid_values = []
-    #             for val in values:
-                    
-    #                 if isinstance(val, (int, float)) and not np.isnan(val):
-    #                     # lta 数据：数值类型
-    #                     valid_values.append(val)                    
-    #                 else:
-    #                     # yearly 数据：字典类型，提取所有年份的值
-    #                     yearly_values = [v for v in val.values() if not np.isnan(v)]
-    #                     valid_values.append(np.nanmean(yearly_values))
-                        
-    #                     # 其他情况（如字符串、None等）跳过
-    #             valid_values = np.array(valid_values)
-    #             if len(valid_values) > 0:
-    #                 min_val = valid_values.min()
-    #                 max_val = valid_values.max()
-    #                 mean_val = valid_values.mean()
-    #                 valid_count = len(valid_values)
-    #                 print(f"  {indicator}: 有效值{valid_count}个, 范围[{min_val:.2f}, {max_val:.2f}], 均值{mean_val:.2f}")
-    #             else:
-    #                 print(f"  {indicator}: 无有效值")
-
     def _print_indicator_stats(self, results_df: pd.DataFrame, indicator_configs: Dict[str, Any]) -> None:
         """打印指标统计信息 - 适配 yearly 和 lta 数据类型"""
         indicator_names = list(indicator_configs.keys())
@@ -170,117 +385,117 @@ class DataManager:
         else:
             return self._calculate_sequential_optimized(station_ids, indicator_configs, start_date, end_date, output_csv)
     
-    def _calculate_parallel_optimized(self, station_ids, indicator_configs, start_date, end_date, output_csv):
-        """优化的并行计算"""
-        print(f"使用多进程计算，进程数: {self.num_processes}")
-        start_time = time.time()
+    # def _calculate_parallel_optimized(self, station_ids, indicator_configs, start_date, end_date, output_csv):
+    #     """优化的并行计算"""
+    #     print(f"使用多进程计算，进程数: {self.num_processes}")
+    #     start_time = time.time()
         
-        results_df = pd.DataFrame()
+    #     results_df = pd.DataFrame()
         
-        # 使用multiprocessing.Pool（更稳定）
-        import multiprocessing as mp
-        from multiprocessing import Pool
+    #     # 使用multiprocessing.Pool（更稳定）
+    #     import multiprocessing as mp
+    #     from multiprocessing import Pool
         
-        try:
-            with Pool(processes=self.num_processes) as pool:
-                # 准备任务
-                tasks = [(station_id, indicator_configs, start_date, end_date) 
-                        for station_id in station_ids]
+    #     try:
+    #         with Pool(processes=self.num_processes) as pool:
+    #             # 准备任务
+    #             tasks = [(station_id, indicator_configs, start_date, end_date) 
+    #                     for station_id in station_ids]
                 
-                # 使用imap_unordered提高性能
-                results = list(tqdm(
-                    pool.imap_unordered(self._station_worker_optimized, tasks),
-                    total=len(station_ids),
-                    desc="计算站点指标"
-                ))
+    #             # 使用imap_unordered提高性能
+    #             results = list(tqdm(
+    #                 pool.imap_unordered(self._station_worker_optimized, tasks),
+    #                 total=len(station_ids),
+    #                 desc="计算站点指标"
+    #             ))
             
-            # 合并结果
-            valid_results = [r for r in results if r and 'error' not in r or r.get('error') is None]
-            error_results = [r for r in results if r and 'error' in r and r['error'] is not None]
+    #         # 合并结果
+    #         valid_results = [r for r in results if r and 'error' not in r or r.get('error') is None]
+    #         error_results = [r for r in results if r and 'error' in r and r['error'] is not None]
             
-            if valid_results:
-                results_df = pd.DataFrame(valid_results)
-            if error_results:
-                error_df = pd.DataFrame(error_results)
-                print(f"有 {len(error_results)} 个站点计算失败")
-                # 可以选择保存错误信息
+    #         if valid_results:
+    #             results_df = pd.DataFrame(valid_results)
+    #         if error_results:
+    #             error_df = pd.DataFrame(error_results)
+    #             print(f"有 {len(error_results)} 个站点计算失败")
+    #             # 可以选择保存错误信息
             
-        except Exception as e:
-            print(f"多进程计算失败: {str(e)}，回退到单进程")
-            return self._calculate_sequential_optimized(station_ids, indicator_configs, start_date, end_date, output_csv)
+    #     except Exception as e:
+    #         print(f"多进程计算失败: {str(e)}，回退到单进程")
+    #         return self._calculate_sequential_optimized(station_ids, indicator_configs, start_date, end_date, output_csv)
         
-        end_time = time.time()
-        print(f'多进程计算完成，耗时 {end_time - start_time:.2f} 秒，成功: {len(valid_results)}/{len(station_ids)}')
+    #     end_time = time.time()
+    #     print(f'多进程计算完成，耗时 {end_time - start_time:.2f} 秒，成功: {len(valid_results)}/{len(station_ids)}')
         
-        # 保存结果
-        if output_csv and not results_df.empty:
-            self._save_results_optimized(results_df, output_csv)
+    #     # 保存结果
+    #     if output_csv and not results_df.empty:
+    #         self._save_results_optimized(results_df, output_csv)
         
-        return results_df
+    #     return results_df
     
-    def _calculate_sequential_optimized(self, station_ids, indicator_configs, start_date, end_date, output_csv):
-        """优化的顺序计算"""
-        print("使用优化的单进程计算")
-        start_time = time.time()
+    # def _calculate_sequential_optimized(self, station_ids, indicator_configs, start_date, end_date, output_csv):
+    #     """优化的顺序计算"""
+    #     print("使用优化的单进程计算")
+    #     start_time = time.time()
         
-        results = []
+    #     results = []
         
-        for station_id in tqdm(station_ids, desc="计算站点指标"):
-            try:
-                result = self._station_worker_optimized((station_id, indicator_configs, start_date, end_date))
-                if result:
-                    results.append(result)
-            except Exception as e:
-                print(f"站点 {station_id} 计算异常: {str(e)}")
-                results.append({"station_id": station_id, "error": str(e)})
+    #     for station_id in tqdm(station_ids, desc="计算站点指标"):
+    #         try:
+    #             result = self._station_worker_optimized((station_id, indicator_configs, start_date, end_date))
+    #             if result:
+    #                 results.append(result)
+    #         except Exception as e:
+    #             print(f"站点 {station_id} 计算异常: {str(e)}")
+    #             results.append({"station_id": station_id, "error": str(e)})
         
-        # 批量创建DataFrame
-        if results:
-            results_df = pd.DataFrame(results)
-        else:
-            results_df = pd.DataFrame()
+    #     # 批量创建DataFrame
+    #     if results:
+    #         results_df = pd.DataFrame(results)
+    #     else:
+    #         results_df = pd.DataFrame()
         
-        # 统计成功和失败
-        success_count = len([r for r in results if 'error' not in r or not r.get('error')])
-        error_count = len(results) - success_count
+    #     # 统计成功和失败
+    #     success_count = len([r for r in results if 'error' not in r or not r.get('error')])
+    #     error_count = len(results) - success_count
         
-        end_time = time.time()
-        print(f'单进程计算完成，耗时 {end_time - start_time:.2f} 秒，成功: {success_count}/{len(station_ids)}')
+    #     end_time = time.time()
+    #     print(f'单进程计算完成，耗时 {end_time - start_time:.2f} 秒，成功: {success_count}/{len(station_ids)}')
         
-        # 保存结果
-        if output_csv and not results_df.empty:
-            self._save_results_optimized(results_df, output_csv)
+    #     # 保存结果
+    #     if output_csv and not results_df.empty:
+    #         self._save_results_optimized(results_df, output_csv)
         
-        return results_df
+    #     return results_df
     
-    def _station_worker_optimized(self, args):
-        """优化的工作函数"""
-        station_id, indicator_configs, start_date, end_date = args
-        try:
-            # 加载站点数据
-            data = self.load_station_data(station_id, start_date, end_date)
-            if data.empty:
-                return {"station_id": station_id, "error": "无数据"}
+    # def _station_worker_optimized(self, args):
+    #     """优化的工作函数"""
+    #     station_id, indicator_configs, start_date, end_date = args
+    #     try:
+    #         # 加载站点数据
+    #         data = self.load_station_data(station_id, start_date, end_date)
+    #         if data.empty:
+    #             return {"station_id": station_id, "error": "无数据"}
             
-            station_results = {"station_id": station_id}
+    #         station_results = {"station_id": station_id}
             
-            # 获取站点信息
-            station_info = self.get_station_info(station_id)
-            station_results.update(station_info)
+    #         # 获取站点信息
+    #         station_info = self.get_station_info(station_id)
+    #         station_results.update(station_info)
             
-            # 计算每个指标
-            for indicator_name, indicator_config in indicator_configs.items():
-                try:
-                    value = self.indicator_calculator.calculate(data, indicator_config)
-                    station_results[indicator_name] = value
-                except Exception as e:
-                    print(f"站点 {station_id} 指标 {indicator_name} 计算失败: {str(e)}")
-                    station_results[indicator_name] = np.nan
+    #         # 计算每个指标
+    #         for indicator_name, indicator_config in indicator_configs.items():
+    #             try:
+    #                 value = self.indicator_calculator.calculate(data, indicator_config)
+    #                 station_results[indicator_name] = value
+    #             except Exception as e:
+    #                 print(f"站点 {station_id} 指标 {indicator_name} 计算失败: {str(e)}")
+    #                 station_results[indicator_name] = np.nan
             
-            return station_results
-        except Exception as e:
-            print(f"计算站点 {station_id} 失败: {str(e)}")
-            return {"station_id": station_id, "error": str(e)}
+    #         return station_results
+    #     except Exception as e:
+    #         print(f"计算站点 {station_id} 失败: {str(e)}")
+    #         return {"station_id": station_id, "error": str(e)}
     
     def _save_results_optimized(self, results_df, output_csv):
         """优化的结果保存"""
@@ -366,9 +581,9 @@ class DataManager:
                     'lat': first_record.get('lat', np.nan),
                     'lon': first_record.get('lon', np.nan),
                     'altitude': first_record.get('altitude', np.nan),
-                    'province': '',
-                    'city': '',
-                    'county': ''
+                    'province': first_record.get('province', np.nan),
+                    'city':first_record.get('city', np.nan),
+                    'county': first_record.get('county', np.nan),
                 }
                 return station_info
         except:
@@ -396,7 +611,7 @@ class DataManager:
         # data.iloc[:,1:]=targetdata.applymap(lambda x:x-999800 if (x>999800)&(x<999900) else x)
         # data.iloc[:,1:]=targetdata.applymap(lambda x:-999 if (x>1000)|(x<-1000) else x)
         
-        data = data.replace(["999999.0","999990.0", "999.0", "999999","-999999",-999999, 999999,999990, 999, "999", np.nan, None],np.nan)
+        data = data.replace(["999999.0","999990.0", "999.0", "999999","-999999",-999999, 999999,999990,999998, 999, "999", np.nan, None],np.nan)
         data[(data.values>999600) & (data.values<999700)] = data - 999600
         data[(data.values>999700) & (data.values<999800)] = data - 999700
         data[(data.values>999800) & (data.values<999900)] = data - 999800
@@ -438,7 +653,9 @@ class DataManager:
         data = data.iloc[1:,:]  # 获取时间和四列变量
         data['lat']=stn_info['lat'][0]
         data['lon']=stn_info['lon'][0]
-        data['altitude'] = stn_info['altitude'][0]        
+        data['altitude'] = stn_info['altitude'][0]
+        # data['City'] = stn_info['City'][0]
+        # data['Cnty'] = stn_info['Cnty'][0]
         
         # 转换日期格式
         try:

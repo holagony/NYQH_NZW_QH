@@ -9,6 +9,7 @@ try:
     import gdal, osr, ogr
 except:
     from osgeo import gdal, osr, ogr
+import shapefile
 from tqdm import tqdm
 import numpy as np
 from pykrige.ok import OrdinaryKriging
@@ -765,7 +766,7 @@ class RasterTool:
         # y_class = y_class.astype(np.int32)  
         # save_array_to_tif(y_class, outfile, projection, geotransform)
         # 保存结果为GeoTIFF文件
-        save_array_to_tif(grid_values, outfile, projection, geotransform)
+        RasterTool.save_array_to_tif(grid_values, outfile, projection, geotransform)
         dataset = None
         grid_data=None
         # os.remove(tempfile)
@@ -2143,59 +2144,59 @@ class RasterTool:
         finally:
             ds = None   
                  
-    @staticmethod
-    def maskRasterByRaster(infile, maskfile, outfile, mask_nodata=None, dst_nodata=None, srs_nodata=None):
-        """
-        数据掩膜
-        :param infile: 文件或文件对象
-        :param maskfile: 文件或文件对象
-        :param outfile: str,结果文件
-        :param mask_nodata: float， 掩膜的无效值
-        :param dst_nodata: float, 输出的无效值
-        :return:
-        """
-        try:
-            try:
-                inds = gdal.Open(infile)
-            except:
-                inds = infile
-            indata = inds.ReadAsArray()
-            cols = inds.RasterXSize
-            rows = inds.RasterYSize
-            geo = inds.GetGeoTransform()
-            proj = inds.GetProjection()
-            band = inds.GetRasterBand(1)
-            if srs_nodata is not None:
-                pass
-            else:
-                srs_nodata = band.GetNoDataValue()
-            indata[indata == srs_nodata] = dst_nodata
-            try:
-                maskds = gdal.Open(maskfile)
-            except:
-                maskds = maskfile
-            maskdata = maskds.ReadAsArray()
-            band_mask = maskds.GetRasterBand(1)
-            if mask_nodata is not None:
-                pass
-            else:
-                mask_nodata = band_mask.GetNoDataValue()
-            indata[maskdata == mask_nodata] = dst_nodata
-            if outfile is None:
-                driver = gdal.GetDriverByName("MEM")
-                out_ds = driver.Create("", cols, rows, 1, band.DataType)
-            else:
-                driver = gdal.GetDriverByName("Gtiff")
-                out_ds = driver.Create(outfile, cols, rows, 1, band.DataType)
-            out_ds.SetGeoTransform(geo)
-            out_ds.SetProjection(proj)
-            out_band = out_ds.GetRasterBand(1)
-            out_band.WriteArray(indata)
-            out_band.SetNoDataValue(dst_nodata)
-            return out_ds
-        finally:
-            inds = None
-            maskds = None
+    # @staticmethod
+    # def maskRasterByRaster(infile, maskfile, outfile, mask_nodata=None, dst_nodata=None, srs_nodata=None):
+    #     """
+    #     数据掩膜
+    #     :param infile: 文件或文件对象
+    #     :param maskfile: 文件或文件对象
+    #     :param outfile: str,结果文件
+    #     :param mask_nodata: float， 掩膜的无效值
+    #     :param dst_nodata: float, 输出的无效值
+    #     :return:
+    #     """
+    #     try:
+    #         try:
+    #             inds = gdal.Open(infile)
+    #         except:
+    #             inds = infile
+    #         indata = inds.ReadAsArray()
+    #         cols = inds.RasterXSize
+    #         rows = inds.RasterYSize
+    #         geo = inds.GetGeoTransform()
+    #         proj = inds.GetProjection()
+    #         band = inds.GetRasterBand(1)
+    #         if srs_nodata is not None:
+    #             pass
+    #         else:
+    #             srs_nodata = band.GetNoDataValue()
+    #         indata[indata == srs_nodata] = dst_nodata
+    #         try:
+    #             maskds = gdal.Open(maskfile)
+    #         except:
+    #             maskds = maskfile
+    #         maskdata = maskds.ReadAsArray()
+    #         band_mask = maskds.GetRasterBand(1)
+    #         if mask_nodata is not None:
+    #             pass
+    #         else:
+    #             mask_nodata = band_mask.GetNoDataValue()
+    #         indata[maskdata == mask_nodata] = dst_nodata
+    #         if outfile is None:
+    #             driver = gdal.GetDriverByName("MEM")
+    #             out_ds = driver.Create("", cols, rows, 1, band.DataType)
+    #         else:
+    #             driver = gdal.GetDriverByName("Gtiff")
+    #             out_ds = driver.Create(outfile, cols, rows, 1, band.DataType)
+    #         out_ds.SetGeoTransform(geo)
+    #         out_ds.SetProjection(proj)
+    #         out_band = out_ds.GetRasterBand(1)
+    #         out_band.WriteArray(indata)
+    #         out_band.SetNoDataValue(dst_nodata)
+    #         return out_ds
+    #     finally:
+    #         inds = None
+    #         maskds = None
   
 
     @staticmethod
@@ -2318,6 +2319,125 @@ class RasterTool:
         else:
             dst_ds = None  # Flush to disk
             return dst_filename
+
+    @staticmethod
+    def tif_clip_use_shpfile(infile=None,outfile=None,shpfile=None,outputbounds=None,nodata = 0):
+        '''
+        利用shp文件对tif文件进行裁剪
+        '''
+        
+        if outfile is None:
+            format_ = 'MEM'
+        else:
+            format_ = 'GTiff'
+
+        if shpfile is not None:
+            shp = shapefile.Reader(shpfile)
+            outputbounds=shp.bbox
+
+            ds = gdal.Warp(outfile,infile, format=format_,
+                        outputBounds=outputbounds,
+                        cutlineDSName = shpfile,    # 作为数据分割线的矢量
+                        cropToCutline=True,         # 按照分割线裁剪数据集
+                        # cutlineWhere="FIELD = 'whatever'",
+                        dstNodata = nodata )
+        elif outputbounds is not None:
+            ds = gdal.Warp(outfile,infile, format = format_,
+                    outputBounds=outputbounds, dstNodata = nodata)
+        else:
+            try:
+                dataset = gdal.Open(infile)
+            except:
+                dataset = infile
+            #获取地理信息
+            img_geotrans = dataset.GetGeoTransform()
+            rows = dataset.RasterXSize
+            cols = dataset.RasterYSize
+
+            lonmax = img_geotrans[0] + (cols-1)*img_geotrans[1] + (rows-1)*img_geotrans[2]
+            lonmin = img_geotrans[0]
+            latmax = img_geotrans[3]
+            latmin = img_geotrans[3] + (cols-1)*img_geotrans[4] + (rows-1)*img_geotrans[5]
+
+            outputbounds=(lonmin, latmin,lonmax, latmax)
+            ds = gdal.Warp(outfile,infile,format = format_,\
+                    outputBounds=outputbounds, dstNodata = nodata)
+
+        return ds
+
+    @staticmethod
+    def mask_raster_by_grid(infile: str, outfile: str, gridfile: str, resample_alg='bilinear'):
+        """
+        使用格网文件对栅格数据进行掩膜，确保对齐经纬度和网格数
+        
+        Parameters:
+        -----------
+        infile : str
+            输入栅格文件路径
+        outfile : str  
+            输出栅格文件路径
+        gridfile : str
+            参考格网文件路径
+        resample_alg : str
+            重采样算法，可选 'nearest', 'bilinear', 'cubic', 等
+        """
+        try:
+            # 打开格网文件
+            grid_ds = gdal.Open(gridfile)
+            if grid_ds is None:
+                raise ValueError(f"无法打开格网文件: {gridfile}")
+            
+            # 获取格网文件信息
+            grid_geo = grid_ds.GetGeoTransform()
+            grid_proj = grid_ds.GetProjection()
+            grid_xsize = grid_ds.RasterXSize
+            grid_ysize = grid_ds.RasterYSize
+            
+            # 计算范围
+            ulx = grid_geo[0]
+            uly = grid_geo[3]
+            lrx = ulx + grid_geo[1] * grid_xsize
+            lry = uly + grid_geo[5] * grid_ysize
+            
+            # 重采样算法映射
+            resample_alg_map = {
+                'nearest': gdal.GRA_NearestNeighbour,
+                'bilinear': gdal.GRA_Bilinear,
+                'cubic': gdal.GRA_Cubic,
+                'cubicspline': gdal.GRA_CubicSpline,
+                'lanczos': gdal.GRA_Lanczos,
+                'average': gdal.GRA_Average,
+                'mode': gdal.GRA_Mode
+            }
+            
+            resample_method = resample_alg_map.get(resample_alg, gdal.GRA_Bilinear)
+            
+            # Warp选项 - 确保与格网文件完全对齐
+            warp_options = gdal.WarpOptions(
+                format='GTiff',
+                outputBounds=[ulx, lry, lrx, uly],
+                width=grid_xsize,
+                height=grid_ysize,
+                dstSRS=grid_proj,
+                resampleAlg=resample_method,
+                outputType=gdal.GDT_Float32,  # 统一输出类型
+                creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=IF_SAFER']
+            )
+            
+            # 执行Warp
+            result_ds = gdal.Warp(outfile, infile, options=warp_options)
+            if result_ds is None:
+                raise ValueError(f"栅格掩膜失败: {infile} -> {outfile}")
+            
+            result_ds = None
+            grid_ds = None
+            
+            print(f"成功掩膜栅格: {infile} -> {outfile}")
+            return True
+            
+        except Exception as e:
+            print(f"栅格掩膜异常: {str(e)}")
+            return False
 
 
 if __name__ == "__main__":

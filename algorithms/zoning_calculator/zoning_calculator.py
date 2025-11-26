@@ -459,23 +459,6 @@ class WIWH_PZ:
             # 栅格级别计算
             return self._calculate_grid_level(interpolated_indicators, formula_str, variables_config, crop_config)
 
-    def _standardize_grid(self, grid_data: np.ndarray) -> np.ndarray:
-        """对栅格数据进行标准化"""
-        valid_mask = ~np.isnan(grid_data)
-        if not np.any(valid_mask):
-            return np.full_like(grid_data, np.nan)
-
-        valid_values = grid_data[valid_mask]
-        min_val = np.min(valid_values)
-        max_val = np.max(valid_values)
-
-        if max_val == min_val:
-            return np.full_like(grid_data, 0.5)
-
-        standardized = np.full_like(grid_data, np.nan)
-        standardized[valid_mask] = (valid_values - min_val) / (max_val - min_val)
-        return standardized
-
     def _detect_calculation_level(self, interpolated_indicators: Dict[str, Any]) -> str:
         """检测计算级别"""
         for indicator_name, indicator_data in interpolated_indicators.items():

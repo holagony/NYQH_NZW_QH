@@ -236,6 +236,67 @@ class VectorTool:
             ds = None
             shp_ds = None
 
+    @staticmethod
+    def shp_region_select_PAC(in_shp,outfile,filed_name,region_list): 
+        #in_shp为输入shp文件； outfile输出文件；filed_name提取字段的名称；file_name输入文件的名称
+        gdal.SetConfigOption('SHAPE_ENCODING', 'UTF-8')
+        shp = ogr.Open(in_shp,1)   #打开shp文件
+        lyr = shp.GetLayer()
+        lydefn = lyr.GetLayerDefn()
+        spatialref = lyr.GetSpatialRef()  #获取空间坐标系
+        geomtype = lydefn.GetGeomType()   #文件类型（point，polyline，polygon等）
+        a=[]  #初始化列表
+        # b=[]  #初始化列表
+        for i,fea in enumerate(lyr):
+
+            feat = lyr.GetFeature(i)
+            # x_min, x_max, y_min, y_max=feat.GetGeometryRef().Boundary().GetEnvelope()
+            # print(feat.GetGeometryRef().Boundary().GetEnvelope())
+            # x_min, x_max, y_min, y_max
+            fid = feat.GetField(filed_name) 
+            if ((str(fid)[0:2]+"0000") in region_list) | ((str(fid)[0:4]+"00") in region_list)| (str(fid) in region_list):
+            # if (x_max>=102) and (y_min<=35):
+                a.append(fid)                #获取字段的属性值
+        # a = list(set(a))                 #剔除重复的属性值，得到属性值列表
+        # print(b[1])
+
+        driver = ogr.GetDriverByName("ESRI Shapefile")   #创建shp驱动
+        out_shp = driver.CreateDataSource(outfile)    #创建文件，文件命名为字段属性值+输入的文件名。
+        
+        outlayer = out_shp.CreateLayer('0', srs=spatialref, geom_type=geomtype ,options=("ENCODING=GBK", ))   
+        # outlayer = out_shp.CreateLayer('0', srs=spatialref, geom_type=geomtype ,options=("ENCODING=UTF-8", ))
+        # print("GetFieldCount ", lydefn.GetFieldCount())
+        # print("GetFeatureCount ", lyr.GetFeatureCount())
+        for k in range(0,lydefn.GetFieldCount()):
+            fieldDefn = lydefn.GetFieldDefn(k)
+            fieldType = fieldDefn.GetType()
+            # print("fieldType ", fieldType)
+            ret = outlayer.CreateField(fieldDefn, fieldType)
+            # print("ret  ", ret)
+        outlayerDefn = outlayer.GetLayerDefn()
+        # print("outlayerDefn.GetFieldCount() ", outlayerDefn.GetFieldCount())
+        
+        for i in range(0,lyr.GetFeatureCount()):
+            feat = lyr.GetFeature(i)
+            fid = feat.GetField(filed_name)
+            
+            for j in range(len(a)): 
+                if fid == a[j]:    #判断属性值等于其中某一个值，提取相应的图层
+                    outFeature = ogr.Feature(outlayerDefn)
+                    geom = feat.GetGeometryRef()
+                    outFeature.SetGeometry(geom)
+                    
+                    for k in range(0, outlayerDefn.GetFieldCount()):
+                        fieldDefn = outlayerDefn.GetFieldDefn(k)
+                        # print(outlayerDefn.GetFieldDefn(k).GetName().encode("gbk"), "  ", feat.GetField(k))
+                        outFeature.SetField(outlayerDefn.GetFieldDefn(k).GetName(), feat.GetField(k))
+                    
+                    outlayer.CreateFeature(outFeature)
+                    outFeature = None
+        out_shp=None
+
+
+
 if __name__ == "__main__":
     import glob
     import os

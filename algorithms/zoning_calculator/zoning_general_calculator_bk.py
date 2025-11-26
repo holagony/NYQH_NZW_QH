@@ -295,7 +295,9 @@ class GenericZoningCalculator:
         # 第四步：计算每个站点的综合指标
         print("计算站点综合指标...")
         station_composite_values = self._calculate_composite_from_dataframe(normalized_df, formula_config)
-        
+        # values = station_composite_values.values
+        # values=self.dataNormal_array(values)
+        # station_composite_values[:]=values
         valid_station_count = station_composite_values.notna().sum()
         print(f"成功计算归一化综合指标的站点数: {valid_station_count}/{len(station_composite_values)}")
 
@@ -310,7 +312,9 @@ class GenericZoningCalculator:
                 'dem_path': config.get("demFilePath", ""),
                 'shp_path': config.get("shpFilePath", ""),
                 'grid_path': config.get("gridFilePath", ""),
-                'area_code': config.get("areaCode", "")
+                'area_code': config.get("areaCode", ""),
+                'min_value':0,
+                'max_value':1
             }
 
             # 检查中间结果是否存在
@@ -558,49 +562,21 @@ class GenericZoningCalculator:
             var_value = self._compute_variable_unified(var_config, indicators, data_type)
             variables_data[var_name] = var_value
 
-        # # 计算公式（包含权重处理）
-        # try:
-        #     result_data = self._evaluate_formula_with_weights(formula_str, variables_data, formula_config)
-        #     valid_count = np.sum(~np.isnan(result_data))
-        #     total_count = result_data.size
-        #     if valid_count > 0:
-        #         min_val = np.nanmin(result_data)
-        #         max_val = np.nanmax(result_data)
-        #         mean_val = np.nanmean(result_data)
-        #         print(f"综合指标结果: {valid_count}/{total_count} 有效像素, 范围[{min_val:.4f}, {max_val:.4f}], 均值{mean_val:.4f}")
-        #
-        # except Exception as e:
-        #     print(f"公式计算失败: {str(e)}")
-        #     raise
         # 计算公式（包含权重处理）
         try:
             result_data = self._evaluate_formula_with_weights(formula_str, variables_data, formula_config)
-
-            # 统一转换为numpy数组处理
-            if isinstance(result_data, (int, float)):
-                result_array = np.array([result_data])
-            else:
-                result_array = np.array(result_data)
-
-            valid_count = np.sum(~np.isnan(result_array))
-            total_count = result_array.size
-
+            valid_count = np.sum(~np.isnan(result_data))
+            total_count = result_data.size
             if valid_count > 0:
-                min_val = np.nanmin(result_array)
-                max_val = np.nanmax(result_array)
-                mean_val = np.nanmean(result_array)
-
-                if total_count == 1:
-                    print(f"综合指标结果: 单个数值 {mean_val:.4f}")
-                else:
-                    print(
-                        f"综合指标结果: {valid_count}/{total_count} 有效值, 范围[{min_val:.4f}, {max_val:.4f}], 均值{mean_val:.4f}")
-            else:
-                print(f"综合指标结果: 无有效数据")
+                min_val = np.nanmin(result_data)
+                max_val = np.nanmax(result_data)
+                mean_val = np.nanmean(result_data)
+                print(f"综合指标结果: {valid_count}/{total_count} 有效像素, 范围[{min_val:.4f}, {max_val:.4f}], 均值{mean_val:.4f}")
 
         except Exception as e:
             print(f"公式计算失败: {str(e)}")
             raise
+
         # 根据数据类型包装结果
         if data_type == "station":
             # 站点数据结果包装
@@ -661,9 +637,8 @@ class GenericZoningCalculator:
             else:
                 raise ValueError("标准化配置缺少引用")
 
-        elif "value" in var_config:
-            value_config = var_config.get("value", {})
-            ref_name = value_config["ref"]
+        elif "ref" in var_config:
+            ref_name = var_config["ref"]
             if ref_name in indicators:
                 return self._extract_data(indicators[ref_name], data_type)
             else:
@@ -725,12 +700,12 @@ class GenericZoningCalculator:
             else:
                 raise ValueError(f"不支持的栅格数据格式: {type(indicator_data)}")
 
-    def _evaluate_formula_with_weights(self, formula_str: str, variables_data: Dict[str, Any],
+    def _evaluate_formula_with_weights(self, formula_str: str, variables_data: Dict[str, Any], 
                                       formula_config: Dict[str, Any]) -> Any:
         """评估公式，支持权重系数"""
         # 获取权重配置
         weights = formula_config.get("weight", {})
-
+        
         # 准备变量映射，包含权重
         local_env = {'np': np}
         local_env.update(variables_data)
