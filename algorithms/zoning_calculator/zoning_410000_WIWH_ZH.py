@@ -315,6 +315,7 @@ class WIWH_ZH:
     def _calculate_continuous_rain_indicators_station(self, station_indicators, params):
         """在站点级别计算连阴雨指标"""
         continuous_rain_indicators = {}
+        all_stations_raw_data = pd.DataFrame()
 
         for station_id, indicators in station_indicators.items():
 
@@ -330,6 +331,11 @@ class WIWH_ZH:
 
             merged_df = pd.concat([Pre_df, SSH_df, Pre_days_df], axis=1)
             merged_df.columns = ['Pre', 'SSH', 'Pre_days']
+
+            # 保存原始数据（分类前）到总数据框中
+            raw_data_copy = merged_df.copy()
+            raw_data_copy['站点ID'] = station_id
+            all_stations_raw_data = pd.concat([all_stations_raw_data, raw_data_copy])
 
             # 按标准赋值
             merged_df['Pre'] = merged_df['Pre'].apply(pre_category)
@@ -368,65 +374,184 @@ class WIWH_ZH:
         result_df.to_csv(output_path, index=False, encoding='utf-8-sig')
         print(f"连阴雨指标综合指数文件已保存为 '{output_path}'")
 
+        station_avg = all_stations_raw_data.groupby('站点ID')[['Pre', 'SSH', 'Pre_days']].mean()
+        station_avg.to_csv(intermediate_dir / f'连阴雨指标_站点多年平均_{timestamp}.csv', index=True, encoding='utf-8-sig')
+        
         return continuous_rain_indicators
 
-    def _interpolate_continuous_rain_risk(self, continuous_rain_risk_station, station_coords, config, crop_config):
-        """对连阴雨综合风险指数进行插值"""
-        interpolation = crop_config.get("interpolation")
-        interpolation_method = interpolation.get('method', 'lsm_idw')
-        interpolation_params = interpolation.get('params', {})
+    def _calculate_GRF_index(self, station_indicators: pd.DataFrame, config: Dict[str, Any]) -> Dict[int, float]:
+        """
+        计算干热风强度指数R
+        
+        计算公式：R = Σ(Wi * Di * Ni)
+        其中：Wi为权重，Di为标记值，Ni为干热风日数
+        """
+        GRF_indicators = {}
 
+        for station_id, indicators in station_indicators.items():
+
+            # 获取基础指标
+            GRF_light = indicators.get('GRF_light', np.nan)  # 总降水量
+            GRF_severe = indicators.get('GRF_severe', np.nan)  # 降水日数
+
+            # str转字典
+            GRF_light = pd.DataFrame.from_dict(GRF_light, orient='index')
+            GRF_severe = pd.DataFrame.from_dict(GRF_severe, orient='index')
+
+            merged_df = pd.concat([GRF_light, GRF_severe], axis=1)
+            merged_df.columns = ['GRF_light', 'GRF_severe']
+
+
+            merged_df['GRF_index'] = merged_df['GRF_light'] * 0.35+ \
+                                     merged_df['GRF_severe'] * 0.65
+
+            GRF_indicators[station_id] = merged_df['GRF_index'].mean()
+            '''
+            GRF_indicators[station_id] = merged_df['GRF_light'].mean() * self.WEIGHTS['GRF_light'] * self.MARKS['GRF_light'] + \
+                                     merged_df['GRF_moderate'].mean() * self.WEIGHTS['GRF_moderate'] * self.MARKS['GRF_moderate'] + \
+                                     merged_df['GRF_severe'].mean() * self.WEIGHTS['GRF_severe'] * self.MARKS['GRF_severe']
+            '''
+        max_value = max(GRF_indicators.values())
+        max_keys = [key for key, value in GRF_indicators.items() if value == max_value]
+        min_value = min(GRF_indicators.values())
+        min_keys = [key for key, value in GRF_indicators.items() if value == min_value]
+        print(f'河南冬小麦干热风区划:有效站点数据：{len(merged_df)}')
+        print(f'河南冬小麦干热风区划：单站最高干热风强度指数：{max_keys}：{max_value}')
+        print(f'河南冬小麦干热风区划:单站最低干热风强度指数：{min_keys}：{min_value}')
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'干热风强度指数_{timestamp}.csv'
+        result_df = pd.DataFrame(list(GRF_indicators.items()), columns=['站点ID', '干热风强度指数'])   
+        intermediate_dir = Path(config["resultPath"]) / "intermediate"
+        intermediate_dir.mkdir(parents=True, exist_ok=True)
+        output_path = intermediate_dir / filename
+        result_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+        print(f"干热风强度指数文件已保存为 '{output_path}'")
+
+        return GRF_indicators
+
+    def _perform_interpolation_for_indicator(self, station_values, station_coords, params, indicator_name,min_value=np.nan,max_value=np.nan):
+        """对指定指标进行插值计算"""
+        print(f"执行{indicator_name}插值计算...")
+        
+        config = params['config']        
+        # 获取插值算法
+        algorithmConfig = params['algorithmConfig']
+        interpolation_config = algorithmConfig.get("interpolation", {})
+        interpolation_method = interpolation_config.get("method", "lsm_idw")
         interpolator = self._get_algorithm(f"interpolation.{interpolation_method}")
-
-        if interpolator is None:
-            raise ValueError(f"不支持的插值方法: {interpolation_method}")
-
-        print(f"使用 {interpolation_method} 方法对综合风险指数进行插值")
-
-        # 准备插值数据
-        interpolation_data = {'station_values': continuous_rain_risk_station, 'station_coords': station_coords, 'dem_path': config.get("demFilePath", ""), 'shp_path': config.get("shpFilePath", ""), 'grid_path': config.get("gridFilePath", ""), 'area_code': config.get("areaCode", "")}
-
-        # 执行插值
-        try:
-            interpolated_result = interpolator.execute(interpolation_data, interpolation_params)
-            print("综合风险指数插值完成")
+        
+        # 准备插值参数
+        interpolation_data = {
+            'station_values': station_values,
+            'station_coords': station_coords,
+            'dem_path': config.get("demFilePath", ""),
+            'shp_path': config.get("shpFilePath", ""),
+            'grid_path': config.get("gridFilePath", ""),
+            'area_code': config.get("areaCode", ""),
+            'min_value':min_value,
+            'max_value':max_value,
+        }
+        
+        file_name = f"intermediate_{indicator_name}.tif"
+        intermediate_dir = Path(config["resultPath"]) / "intermediate"
+        intermediate_dir.mkdir(parents=True, exist_ok=True)
+        output_path = intermediate_dir / file_name
+        
+        if not os.path.exists(output_path):
+            interpolated_result = interpolator.execute(interpolation_data, interpolation_config.get("params", {}))
+            print(f"{indicator_name}插值完成")
+            
             # 保存中间结果
-            self._save_intermediate_result(interpolated_result, config, "continuous_rain_risk_interpolated")
+            self._save_intermediate_raster(interpolated_result, output_path)
+        else:
+            interpolated_result = self._load_intermediate_raster(output_path)
+        
+        return interpolated_result
 
-            return interpolated_result
+    def _perform_classification(self, data_interpolated, params):
+        """分级计算"""
+        print("执行区域分级计算...")
+        
+        algorithmConfig = params['algorithmConfig']
+        classification = algorithmConfig['classification']
+        classification_method = classification.get('method', 'natural_breaks')
+        
+        classifier = self._get_algorithm(f"classification.{classification_method}")
+        data = classifier.execute(data_interpolated['data'], classification)
+        
+        data_interpolated['data'] = data
+        return data_interpolated
 
-        except Exception as e:
-            print(f"综合风险指数插值失败: {str(e)}")
-            raise
 
-    def _save_intermediate_result(self, result: Dict[str, Any], params: Dict[str, Any], indicator_name: str) -> None:
-        """保存中间结果 - 各个指标的插值结果"""
-        try:
-            print(f"保存中间结果: {indicator_name}")
+    def _save_intermediate_raster(self, result, output_path):
+        """保存中间栅格结果"""
+        from osgeo import gdal
+        import numpy as np
+        
+        data = result['data']
+        meta = result['meta']
+        
+        # 根据数据类型确定GDAL数据类型
+        if data.dtype == np.uint8:
+            datatype = gdal.GDT_Byte
+        elif data.dtype == np.float32:
+            datatype = gdal.GDT_Float32
+        elif data.dtype == np.float64:
+            datatype = gdal.GDT_Float64
+        else:
+            datatype = gdal.GDT_Float32
+        
+        driver = gdal.GetDriverByName('GTiff')
+        dataset = driver.Create(
+            str(output_path),
+            meta['width'],
+            meta['height'],
+            1,
+            datatype,
+            ['COMPRESS=LZW']
+        )
+        
+        dataset.SetGeoTransform(meta['transform'])
+        dataset.SetProjection(meta['crs'])
+        
+        band = dataset.GetRasterBand(1)
+        band.WriteArray(data)
+        band.SetNoDataValue(0)
+        
+        band.FlushCache()
+        dataset = None
+        
+        print(f"中间栅格结果已保存: {output_path}")
 
-            # 生成中间结果文件名
-            file_name = indicator_name + ".tif"
-            intermediate_dir = Path(params["resultPath"]) / "intermediate"
-            intermediate_dir.mkdir(parents=True, exist_ok=True)
-            output_path = intermediate_dir / file_name
-
-            # 使用与最终结果相同的保存逻辑
-            if isinstance(result, dict) and 'data' in result and 'meta' in result:
-                data = result['data']
-                meta = result['meta']
-            elif hasattr(result, 'data') and hasattr(result, 'meta'):
-                data = result.data
-                meta = result.meta
-            else:
-                print(f"警告: 中间结果 {indicator_name} 格式不支持，跳过保存")
-                return
-            meta["nodata"] = -32768
-            # 保存为GeoTIFF
-            self._save_geotiff_gdal(data, meta, output_path)
-
-        except Exception as e:
-            print(f"保存中间结果 {indicator_name} 失败: {str(e)}")
-            # 不抛出异常，继续处理其他指标
+    def _load_intermediate_raster(self, input_path):
+        """加载中间栅格结果"""
+        from osgeo import gdal
+        import numpy as np
+        
+        dataset = gdal.Open(str(input_path))
+        if dataset is None:
+            raise FileNotFoundError(f"无法打开文件: {input_path}")
+        
+        band = dataset.GetRasterBand(1)
+        data = band.ReadAsArray()
+        
+        transform = dataset.GetGeoTransform()
+        crs = dataset.GetProjection()
+        
+        meta = {
+            'width': dataset.RasterXSize,
+            'height': dataset.RasterYSize,
+            'transform': transform,
+            'crs': crs
+        }
+        
+        dataset = None
+        
+        return {
+            'data': data,
+            'meta': meta
+        }
 
     def _save_geotiff_gdal(self, data: np.ndarray, meta: Dict, output_path: str, nodata=0):
         """保存GeoTIFF文件"""
@@ -577,11 +702,35 @@ class WIWH_ZH:
         return {'data': result['data'], 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}, 'type': '河南冬小麦干旱'}
 
     def calculate_dry(self, params):
-        '''
-        干热风区划
-        计算代码写这里
-        '''
-        pass
+
+       """计算干热风 - 先计算站点综合风险指数再插值"""
+       station_indicators = params['station_indicators']
+       station_coords = params['station_coords']
+       algorithmConfig = params['algorithmConfig']
+       config = params['config']
+
+       print("开始计算干热风风险 - 新流程：先计算站点综合风险指数")
+
+       try:
+            # 第一步：在站点级别计算连阴雨指标
+            print('第一步，计算各站的干热风强度指数，并求历年平均')
+            GRF_index = self._calculate_GRF_index(station_indicators, config)
+
+            # 第二步：对综合风险指数F进行插值
+            print("第二步：对综合风险指数F进行插值")
+            interpolated_risk = self._perform_interpolation_for_indicator(GRF_index, station_coords, params, "GRF_risk")
+
+            # 第三步：对插值结果进行分类
+            print('第三步，基于插值栅格化指数进行区划分级')
+            result = self._perform_classification(interpolated_risk, params)
+            
+            print(f'计算{params["config"].get("cropCode","")}-{params["config"].get("zoningType","")}-{params["config"].get("element","")}-区划完成')
+
+       except Exception as e:
+            print(f"干热风风险计算失败: {str(e)}")
+            result = np.nan
+
+       return result
 
     def calculate_wet(self, params):
         """计算小麦连阴雨风险 - 先计算站点综合风险指数再插值"""
@@ -599,18 +748,13 @@ class WIWH_ZH:
 
             # 第二步：对综合风险指数F进行插值
             print("第二步：对综合风险指数F进行插值")
-            interpolated_risk = self._interpolate_continuous_rain_risk(continuous_rain_indicators, station_coords, config, algorithmConfig)
+            interpolated_risk = self._perform_interpolation_for_indicator(continuous_rain_indicators, station_coords, params, "LCY_risk")
 
             # 第三步：对插值结果进行分类
-            print("第四步：对插值结果进行分类")
-            classification = algorithmConfig['classification']
-            classification_method = classification.get('method', 'custom_thresholds')
-            classifier = self._get_algorithm(f"classification.{classification_method}")
-
-            classified_data = classifier.execute(interpolated_risk['data'], classification)
-            # 准备最终结果
-            result = {'data': classified_data, 'meta': interpolated_risk['meta'], 'type': 'continuous_rain_risk', 'process': 'station_level_calculation'}
-            print("小麦连阴雨风险计算完成")
+            print('第三步，基于插值栅格化指数进行区划分级')
+            result = self._perform_classification(interpolated_risk, params)
+            
+            print(f'计算{params["config"].get("cropCode","")}-{params["config"].get("zoningType","")}-{params["config"].get("element","")}-区划完成')
 
         except Exception as e:
             print(f"小麦连阴雨风险计算失败: {str(e)}")
@@ -713,7 +857,7 @@ class WIWH_ZH:
             return self.calculate_drought(params)
         elif disaster_type == 'CJWSD':  # 晚霜冻
             return self._calculate_frost(params)
-        elif disaster_type == 'dry':  # 干热风
+        elif disaster_type == 'GRF':  # 干热风
             return self.calculate_dry(params)
         elif disaster_type == 'LCY':  # 麦收区连阴雨
             return self.calculate_wet(params)

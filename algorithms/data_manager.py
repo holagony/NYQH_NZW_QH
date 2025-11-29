@@ -611,7 +611,7 @@ class DataManager:
         # data.iloc[:,1:]=targetdata.applymap(lambda x:x-999800 if (x>999800)&(x<999900) else x)
         # data.iloc[:,1:]=targetdata.applymap(lambda x:-999 if (x>1000)|(x<-1000) else x)
         
-        data = data.replace(["999999.0","999990.0", "999.0", "999999","-999999",-999999, 999999,999990,999998, 999, "999", np.nan, None],np.nan)
+        data = data.replace(["999999.0","999990.0", "999.0", "999999", "999998","-999999",-999999, 999999,999990,999998, 999, "999", np.nan, None],np.nan)
         data[(data.values>999600) & (data.values<999700)] = data - 999600
         data[(data.values>999700) & (data.values<999800)] = data - 999700
         data[(data.values>999800) & (data.values<999900)] = data - 999800
