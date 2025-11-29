@@ -18,5 +18,6 @@
   "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH/resultJsonFile.json",
   "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH/resultFlowFile.json",
   "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH",
-  "algorithmConfig": {}
+  "algorithmConfig": {},
+  "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend"
 }
