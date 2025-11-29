@@ -101,5 +101,98 @@
             {"min": 0.65, "max": "","level": 1, "label": "极高风险"}   
             ]
         }
-    }   
+    },
+    "GRF": {
+        "indicators": {
+            "GRF_light": {
+                "type": "conditional_count",
+                "frequency": "yearly",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "tmax",
+                        "operator": ">=",
+                        "value": 32
+                    },
+                    {
+                        "variable": "tmax",
+                        "operator": "<",
+                        "value": 35
+                    },
+                    {
+                        "variable": "rhum",
+                        "operator": "<=",
+                        "value": 30
+                    },
+                    {
+                        "variable": "wind",
+                        "operator": ">=",
+                        "value": 3
+                    },
+                    {
+                        "variable": "wind",
+                        "operator": "<=",
+                        "value": 70
+                    }
+                ],
+                "description": "轻度干热风日数"
+            },
+            "GRF_severe": {
+                "type": "conditional_count",
+                "frequency": "yearly",
+                "start_date": "05-01",
+                "end_date": "06-10",
+                "conditions": [
+                    {
+                        "variable": "tmax",
+                        "operator": ">=",
+                        "value": 35
+                    },
+                    {
+                        "variable": "rhum",
+                        "operator": "<=",
+                        "value": 25
+                    },
+                    {
+                        "variable": "wind",
+                        "operator": ">=",
+                        "value": 3
+                    },
+                    {
+                        "variable": "tmax",
+                        "operator": "<=",
+                        "value": 100
+                    },
+                    {
+                        "variable": "wind",
+                        "operator": "<=",
+                        "value": 70
+                    }
+                ],
+                "description": "重度干热风日数"
+            }
+        },
+        "classification": {
+            "method": "natural_breaks",
+            "num_classes": 4,
+            "thresholds": [
+            {"min": "","max": 0.45, "level": 4, "label": "低风险"},    
+            {"min": 0.45, "max": 0.55, "level": 3, "label": "中风险"},  
+            {"min": 0.55, "max": 0.65, "level": 2, "label": "高风险"},  
+            {"min": 0.65, "max": "","level": 1, "label": "极高风险"}   
+            ]
+        },
+        "interpolation": {
+            "method": "idw",
+            "params": {
+                "block_size": 256,
+                "radius_dist": 5.0,
+                "min_num": 10,
+                "first_size": 100,
+                "nodata":0
+            }
+        }
+    }
+
 }
