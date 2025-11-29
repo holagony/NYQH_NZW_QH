@@ -77,13 +77,18 @@ def hazard_index(U_low, Y_low, U_mid, Y_mid, U_high, Y_high, method):
     Pm = information_diffusion_probabilities(U_mid, Y_mid)
     Ps = information_diffusion_probabilities(U_high, Y_high)
 
-    if method == 'mean':
-        H = 0.2 * np.mean(Pl) + 0.3 * np.mean(Pm) + 0.5 * np.mean(Ps)
-    else:
-        H_pl = float(0.2 * np.sum(Pl))  # 等价矩阵乘法 H_pl = (np.full((1, np.size(Pl)), 0.2) @ Pl.reshape(-1, 1)).item()
-        H_pm = float(0.3 * np.sum(Pm))
-        H_ps = float(0.5 * np.sum(Ps))
-        H = H_pl + H_pm + H_ps
+    # p(ui)是数组，是每个站点在每个出现频次的概率，频次为0表示不出现灾害，Pl表示出现灾害的概率，所以Pl为（1减频次为0的概率）
+    idx0_l = U_low.index(0) if 0 in U_low else None
+    idx0_m = U_mid.index(0) if 0 in U_mid else None
+    idx0_s = U_high.index(0) if 0 in U_high else None
+    p0_l = float(Pl[idx0_l]) if idx0_l is not None and len(Pl) > idx0_l else 0.0
+    p0_m = float(Pm[idx0_m]) if idx0_m is not None and len(Pm) > idx0_m else 0.0
+    p0_s = float(Ps[idx0_s]) if idx0_s is not None and len(Ps) > idx0_s else 0.0
+    occ_l = 1.0 - p0_l
+    occ_m = 1.0 - p0_m
+    occ_s = 1.0 - p0_s
+
+    H = 0.2 * occ_l + 0.3 * occ_m + 0.5 * occ_s
     return float(H)
 
 
