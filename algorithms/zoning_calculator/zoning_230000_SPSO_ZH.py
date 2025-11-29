@@ -710,7 +710,7 @@ class SPSO_ZH:
             result = IDWInterpolation().execute(interp_data, iparams)
 
         # 归一化栅格并保存中间结果tif
-        # result['data'] = normalize_array(result['data'])
+        result['data'] = normalize_array(result['data'])
         g_tif_path = os.path.join(config.get("resultPath"), "intermediate", "低温冷害危险性指数.tif")
         self._save_geotiff_gdal(result['data'], result['meta'], g_tif_path, 0)
 
