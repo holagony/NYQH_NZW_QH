@@ -1,0 +1,131 @@
+{
+  "GRF": {
+    "indicators": {
+      "GRF_light": {
+        "type": "conditional_count",
+        "frequency": "yearly",
+        "start_date": "01-01",
+        "end_date": "12-31",
+        "conditions": [
+          { "variable": "tmax", "operator": ">=", "value": 32 },
+          { "variable": "tmax", "operator": "<", "value": 34 },
+          { "variable": "rhum", "operator": "<=", "value": 30 },
+          { "variable": "wind", "operator": ">=", "value": 3 }
+        ]
+      },
+      "GRF_moderate": {
+        "type": "conditional_count",
+        "frequency": "yearly",
+        "start_date": "01-01",
+        "end_date": "12-31",
+        "conditions": [
+          { "variable": "tmax", "operator": ">=", "value": 34 },
+          { "variable": "tmax", "operator": "<", "value": 35 },
+          { "variable": "rhum", "operator": "<=", "value": 25 },
+          { "variable": "wind", "operator": ">=", "value": 3 }
+        ]
+      },
+      "GRF_severe": {
+        "type": "conditional_count",
+        "frequency": "yearly",
+        "start_date": "01-01",
+        "end_date": "12-31",
+        "conditions": [
+          { "variable": "tmax", "operator": ">=", "value": 35 },
+          { "variable": "rhum", "operator": "<=", "value": 25 },
+          { "variable": "wind", "operator": ">=", "value": 3 }
+        ]
+      }
+    },
+    "weights": {
+      "GRF_light": 0.2,
+      "GRF_moderate": 0.3,
+      "GRF_severe": 0.5
+    },
+    "weights_by_area": {
+      "650000": {
+        "GRF_light": 0.2,
+        "GRF_moderate": 0.3,
+        "GRF_severe": 0.5
+      },
+      "410000": {
+        "GRF_light": 0.35,
+        "GRF_moderate": 0.0,
+        "GRF_severe": 0.65
+      }
+    },
+    "marks": {
+      "GRF_light": 1,
+      "GRF_moderate": 2,
+      "GRF_severe": 3
+    },
+    "marks_by_area": {
+      "650000": {
+        "GRF_light": 1,
+        "GRF_moderate": 2,
+        "GRF_severe": 3
+      },
+      "410000": {
+        "GRF_light": 1,
+        "GRF_moderate": 0,
+        "GRF_severe": 1
+      }
+    },
+    "interpolation": {
+      "method": "lsm_idw",
+      "params": {
+        "block_size": 256,
+        "radius_dist": 5.0,
+        "min_num": 10,
+        "first_size": 100,
+        "nodata": 0
+      }
+    },
+    "interpolation_by_area": {
+      "650000": {
+        "method": "lsm_idw",
+        "params": {
+          "block_size": 256,
+          "radius_dist": 5.0,
+          "min_num": 10,
+          "first_size": 100,
+          "nodata": 0
+        }
+      },
+      "410000": {
+        "method": "lsm_idw",
+        "params": {
+          "block_size": 256,
+          "radius_dist": 5.0,
+          "min_num": 10,
+          "first_size": 100,
+          "nodata": 0
+        }
+      }
+    },
+    "classification": {
+      "method": "custom_thresholds",
+      "thresholds": [
+        { "min": 0, "max": 1, "level": 1, "label": "低风险" },
+        { "min": 1, "max": 3, "level": 2, "label": "中风险" },
+        { "min": 3, "max": 6, "level": 3, "label": "高风险" },
+        { "min": 6, "max": "", "level": 4, "label": "极高风险" }
+      ]
+    },
+    "classification_by_area": {
+      "650000": {
+        "method": "custom_thresholds",
+        "thresholds": [
+          { "min": 0, "max": 1, "level": 1, "label": "低风险" },
+          { "min": 1, "max": 3, "level": 2, "label": "中风险" },
+          { "min": 3, "max": 6, "level": 3, "label": "高风险" },
+          { "min": 6, "max": "", "level": 4, "label": "极高风险" }
+        ]
+      },
+      "410000": {
+        "method": "natural_breaks",
+        "num_classes": 4
+      }
+    }
+  }
+}
