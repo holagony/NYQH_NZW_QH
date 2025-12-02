@@ -15,10 +15,7 @@ class ZH_GRF:
     def _perform_interpolation_for_indicator(self, station_values, station_coords, params, indicator_name, min_value=np.nan, max_value=np.nan):
         config = params['config']
         algorithm_config = params['algorithmConfig']
-        area_code = str(config.get('areaCode', ''))
-        interpolation_default = algorithm_config.get("interpolation", {})
-        interpolation_by_area = algorithm_config.get("interpolation_by_area", {})
-        interpolation_config = interpolation_by_area.get(area_code, interpolation_default)
+        interpolation_config = algorithm_config.get("interpolation", {})
         method = interpolation_config.get("method", "lsm_idw")
         interpolator = self._get_algorithm(f"interpolation.{method}")
 
@@ -48,10 +45,7 @@ class ZH_GRF:
 
     def _perform_classification(self, data_interpolated, params):
         algorithm_config = params['algorithmConfig']
-        area_code = str(params['config'].get('areaCode', ''))
-        classification_default = algorithm_config.get('classification', {})
-        classification_by_area = algorithm_config.get('classification_by_area', {})
-        classification = classification_by_area.get(area_code, classification_default)
+        classification = algorithm_config.get('classification', {})
         method = classification.get('method', 'natural_breaks')
         classifier = self._get_algorithm(f"classification.{method}")
         data = classifier.execute(data_interpolated['data'], classification)
@@ -99,7 +93,6 @@ class ZH_GRF:
         return {'data': data, 'meta': meta}
 
     def _calculate_grf_index(self, station_indicators: pd.DataFrame, algorithm_config: Dict[str, Any], config: Dict[str, Any]) -> Dict[int, float]:
-        area_code = str(config.get('areaCode', ''))
         weights_default = {
             'GRF_light': 0.2,
             'GRF_moderate': 0.3,
@@ -113,14 +106,6 @@ class ZH_GRF:
 
         weights = algorithm_config.get('weights', weights_default)
         marks = algorithm_config.get('marks', marks_default)
-
-        weights_by_area = algorithm_config.get('weights_by_area', {})
-        marks_by_area = algorithm_config.get('marks_by_area', {})
-
-        if area_code and area_code in weights_by_area:
-            weights = weights_by_area.get(area_code, weights)
-        if area_code and area_code in marks_by_area:
-            marks = marks_by_area.get(area_code, marks)
 
         indicators_keys = list(algorithm_config.get('indicators', {}).keys())
         result = {}

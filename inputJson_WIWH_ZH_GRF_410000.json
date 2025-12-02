@@ -18,5 +18,18 @@
   "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_grf/resultJsonFile.json",
   "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_grf/resultFlowFile.json",
   "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_grf",
-  "algorithmConfig": {}
+  "algorithmConfig": {
+    "GRF": {
+      "weights": { "GRF_light": 0.35, "GRF_moderate": 0.0, "GRF_severe": 0.65 },
+      "marks": { "GRF_light": 1, "GRF_moderate": 0, "GRF_severe": 3 },
+      "interpolation": {
+        "method": "lsm_idw",
+        "params": { "block_size": 256, "radius_dist": 5.0, "min_num": 10, "first_size": 100, "nodata": 0 }
+      },
+      "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+      }
+    }
+  }
 }
