@@ -10,7 +10,7 @@
     "formula": {
         "type": "custom_formula",
         "formula": "w1*d0_norm+w2*d1_norm+w3*d2_norm",
-        "description":"w为各项权重，d0_norm代表轻霜冻日数归一化结果，d1_norm代表中霜冻日数归一化结果，d2_norm代表重霜冻日数归一化结果，"
+        "description":"w为各项权重，d0_norm代表轻霜冻日数归一化结果，d1_norm代表中霜冻日数归一化结果，d2_norm代表重霜冻日数归一化结果。"
     },
     "interpolation": {
         "method": "idw",
