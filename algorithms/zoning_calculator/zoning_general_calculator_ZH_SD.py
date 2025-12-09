@@ -934,35 +934,65 @@ class ZH_SD:
         # 第三步：使用归一化后的轻/中/重计算每个站点的W值
         station_values: Dict[str, float] = {}
         formula_config = algorithm_config.get("formula", {})
+
+        # 获取公式字符串
+        formula_str = formula_config.get("formula", "w1*d0_norm+w2*d1_norm+w3*d2_norm")
+        print(f"计算公式: {formula_str}")
+
+        # 从threshold配置中提取权重
+        thresholds = algorithm_config.get("threshold", [])
+        weights_dict = {}
+
+        # 提取各等级的权重，按照level排序
+        for thresh in thresholds:
+            level = thresh.get("level", 1)
+            weight = thresh.get("weight", 0.0)
+            label = thresh.get("label", "")
+
+            # 映射到公式中的变量名
+            if level == 1:
+                weights_dict['w1'] = weight
+                weights_dict['d0_norm_label'] = label  # 轻霜冻
+            elif level == 2:
+                weights_dict['w2'] = weight
+                weights_dict['d1_norm_label'] = label  # 中霜冻
+            elif level == 3:
+                weights_dict['w3'] = weight
+                weights_dict['d2_norm_label'] = label  # 重霜冻
+
+        print(f"权重配置: w1={weights_dict.get('w1', 0.2)}, "
+              f"w2={weights_dict.get('w2', 0.3)}, "
+              f"w3={weights_dict.get('w3', 0.3)}")
+
         for i, sid in enumerate(station_ids):
-            d0_norm = normalized_d0[i]
-            d1_norm = normalized_d1[i]
-            d2_norm = normalized_d2[i]
-            # 使用归一化后的值计算:low_value = 0.3 * d0_norm + 0.7 * d1_norm
-            # 获取公式字符串 - 现在变量名是 d0_norm, d1_norm, d2_norm
-            formula_str = formula_config.get("formula", "0.2*d0_norm+0.3*d1_norm+0.5*d2_norm")
-            # print(f"计算公式: {formula_str}")
+            try:
+                d0_norm = normalized_d0[i]
+                d1_norm = normalized_d1[i]
+                d2_norm = normalized_d2[i]
 
-            # 准备变量字典 - 变量名与公式中的一致
-            variables = {
-                'd0_norm': d0_norm,
-                'd1_norm': d1_norm,
-                'd2_norm': d2_norm,
-                'np': np  # 如果需要使用numpy函数
-            }
+                # 准备变量字典 - 包含归一化值和权重
+                variables = {
+                    'd0_norm': float(d0_norm),
+                    'd1_norm': float(d1_norm),
+                    'd2_norm': float(d2_norm),
+                    'w1': float(weights_dict.get('w1', 0.2)),
+                    'w2': float(weights_dict.get('w2', 0.3)),
+                    'w3': float(weights_dict.get('w3', 0.3)),
+                    'np': np
+                }
 
-            # 安全地计算公式
-            low_value = eval(formula_str, {"__builtins__": {}}, variables)
+                # 安全地计算公式
+                low_value = eval(formula_str, {"__builtins__": {}}, variables)
 
-            # 转换为浮点数并检查有效性
-            if np.isfinite(low_value):
-                station_values[sid] = float(low_value)
-            else:
+                # 转换并检查有效性
+                if np.isfinite(low_value):
+                    station_values[sid] = float(low_value)
+                else:
+                    station_values[sid] = np.nan
+                    print(f"站点 {sid} 计算结果非有限值: {low_value}")
+            except Exception as e:
+                print(f"站点 {sid} 综合值计算失败: {str(e)}")
                 station_values[sid] = np.nan
-                print(f"站点 {sid} 计算结果非有限值: {low_value}")
-
-            # print(
-            #     f"站点 {sid}: d0_norm={d0_norm:.4f}, d1_norm={d1_norm:.4f}, d2_norm={d2_norm:.4f}, low_value={low_value:.4f}")
         # 第四步：插值计算
         interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
