@@ -1,6 +1,6 @@
 {
-    "start_date": "03-19",
-    "end_date": "04-20",
+    "start_date": "01-01",
+    "end_date": "12-31",
     "tavg_threshold": 30,
     "tmax_threshold": 36,
     "indicators": {},
