@@ -1,10 +1,10 @@
 {
+    "start_date": "01-01",
+    "end_date": "12-31",
     "indicators": {
       "GRF_light": {
         "type": "conditional_count",
         "frequency": "yearly",
-        "start_date": "01-01",
-        "end_date": "12-31",
         "conditions": [
           { "variable": "tmax", "operator": ">=", "value": 32 },
           { "variable": "tmax", "operator": "<", "value": 34 },
@@ -15,8 +15,6 @@
       "GRF_moderate": {
         "type": "conditional_count",
         "frequency": "yearly",
-        "start_date": "01-01",
-        "end_date": "12-31",
         "conditions": [
           { "variable": "tmax", "operator": ">=", "value": 34 },
           { "variable": "tmax", "operator": "<", "value": 35 },
@@ -27,8 +25,6 @@
       "GRF_severe": {
         "type": "conditional_count",
         "frequency": "yearly",
-        "start_date": "01-01",
-        "end_date": "12-31",
         "conditions": [
           { "variable": "tmax", "operator": ">=", "value": 35 },
           { "variable": "rhummin", "operator": "<=", "value": 25 },

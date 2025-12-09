@@ -94,3 +94,4 @@ ENV/
 .DS_Store
 .flaskenv
 .spyproject
+qgis_src/

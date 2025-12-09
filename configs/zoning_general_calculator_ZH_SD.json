@@ -1,0 +1,28 @@
+{
+    "start_date":"04-01",
+    "end_date":"12-31",
+    "indicators": {},
+    "threshold": [
+        {"min": -2,"max": -1, "label": "轻"},
+        {"min": -3, "max": -2, "label": "中"},
+        {"min": -4.5, "max": -3,"label": "重"}
+        ],
+    "formula": {
+        "type": "custom_formula",
+        "formula": "0.2*d0_norm+0.3*d1_norm+0.5*d2_norm"
+    },
+    "interpolation": {
+        "method": "idw",
+        "params": {
+            "block_size": 256,
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "nodata":0
+        }
+    },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+    }
+}
