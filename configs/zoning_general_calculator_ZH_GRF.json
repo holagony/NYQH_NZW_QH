@@ -1,5 +1,4 @@
 {
-  "GRF": {
     "indicators": {
       "GRF_light": {
         "type": "conditional_count",
@@ -9,7 +8,7 @@
         "conditions": [
           { "variable": "tmax", "operator": ">=", "value": 32 },
           { "variable": "tmax", "operator": "<", "value": 34 },
-          { "variable": "rhum", "operator": "<=", "value": 30 },
+          { "variable": "rhummin", "operator": "<=", "value": 30 },
           { "variable": "wind", "operator": ">=", "value": 3 }
         ]
       },
@@ -21,7 +20,7 @@
         "conditions": [
           { "variable": "tmax", "operator": ">=", "value": 34 },
           { "variable": "tmax", "operator": "<", "value": 35 },
-          { "variable": "rhum", "operator": "<=", "value": 25 },
+          { "variable": "rhummin", "operator": "<=", "value": 25 },
           { "variable": "wind", "operator": ">=", "value": 3 }
         ]
       },
@@ -32,7 +31,7 @@
         "end_date": "12-31",
         "conditions": [
           { "variable": "tmax", "operator": ">=", "value": 35 },
-          { "variable": "rhum", "operator": "<=", "value": 25 },
+          { "variable": "rhummin", "operator": "<=", "value": 25 },
           { "variable": "wind", "operator": ">=", "value": 3 }
         ]
       }
@@ -67,4 +66,3 @@
       ]
     }
   }
-}

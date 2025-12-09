@@ -56,29 +56,90 @@ class IndicatorCalculator:
             "stable_threshold_extreme": self._calculate_stable_threshold_extreme,
             "fao_pet": self._calculate_fao_pet,
             "aridity_index": self._calculate_aridity_index,
-            "daily_sequence": self._calculate_daily_sequence  # 新增：逐日序列计算
+            "daily_sequence": self._calculate_daily_sequence,  # 新增：逐日序列计算
+            "daily_range_mean": self._calculate_daily_range_mean,  # 新增：TDI 平均气温日较差 （℃）
         }
 
-    def _create_period_mask(self, data_index: pd.DatetimeIndex, start_date_str: str, end_date_str: str) -> pd.Series:
-        """创建时间段掩码 - 向量化版本"""
+    # def _create_period_mask(self, data_index: pd.DatetimeIndex, start_date_str: str, end_date_str: str) -> pd.Series:
+    #     """创建时间段掩码 - 向量化版本"""
+    #     years = data_index.year.unique()
+    #     all_masks = []
+    #
+    #     for year in years:
+    #         try:
+    #             start_date = pd.to_datetime(f"{year}-{start_date_str}")
+    #             end_date = pd.to_datetime(f"{year}-{end_date_str}")
+    #
+    #             # 检查跨年情况
+    #             if end_date < start_date:
+    #                 end_date = pd.to_datetime(f"{year+1}-{end_date_str}")
+    #
+    #             year_mask = (data_index >= start_date) & (data_index <= end_date)
+    #             all_masks.append(year_mask)
+    #         except Exception as e:
+    #             print(f"警告: 无法解析 {year} 年的日期范围: {start_date_str} - {end_date_str}, 错误: {e}")
+    #             continue
+    #
+    #     if all_masks:
+    #         combined_mask = all_masks[0]
+    #         for mask in all_masks[1:]:
+    #             combined_mask = combined_mask | mask
+    #         return combined_mask
+    #     else:
+    #         return pd.Series(False, index=data_index)
+
+    def _create_period_mask(self, data_index: pd.DatetimeIndex, start_date_str: str, end_date_str: str,
+                            year_offset: int = 0) -> pd.Series:
+        """
+        创建时间段掩码 - 支持年份偏移的向量化版本
+
+        Parameters:
+        -----------
+        data_index : pd.DatetimeIndex
+            时间索引
+        start_date_str : str
+            开始日期字符串，格式 "MM-DD"
+        end_date_str : str
+            结束日期字符串，格式 "MM-DD"
+        year_offset : int, default=0
+            年份偏移量
+            0: 当年 (默认)
+            -1: 去年
+            1: 明年
+            -2: 前年
+            2: 后年
+
+        Returns:
+        --------
+        pd.Series
+            布尔掩码Series
+        """
         years = data_index.year.unique()
         all_masks = []
-        
-        for year in years:
+
+        for base_year in years:
             try:
-                start_date = pd.to_datetime(f"{year}-{start_date_str}")
-                end_date = pd.to_datetime(f"{year}-{end_date_str}")
-                
-                # 检查跨年情况
+                # 应用年份偏移
+                start_year = base_year + year_offset
+                end_year = base_year + year_offset
+
+                # 构建完整的日期
+                start_date = pd.to_datetime(f"{start_year}-{start_date_str}")
+                end_date = pd.to_datetime(f"{end_year}-{end_date_str}")
+
+                # 检查跨年情况（保持原有逻辑）
                 if end_date < start_date:
-                    end_date = pd.to_datetime(f"{year+1}-{end_date_str}")
-                
+                    end_date = pd.to_datetime(f"{end_year + 1}-{end_date_str}")
+
+                # 创建当前基础年份的掩码
                 year_mask = (data_index >= start_date) & (data_index <= end_date)
                 all_masks.append(year_mask)
+
             except Exception as e:
-                print(f"警告: 无法解析 {year} 年的日期范围: {start_date_str} - {end_date_str}, 错误: {e}")
+                print(
+                    f"警告: 无法解析基础年份 {base_year} 的日期范围: {start_year}-{start_date_str} - {end_year}-{end_date_str}, 错误: {e}")
                 continue
-        
+
         if all_masks:
             combined_mask = all_masks[0]
             for mask in all_masks[1:]:
@@ -86,7 +147,7 @@ class IndicatorCalculator:
             return combined_mask
         else:
             return pd.Series(False, index=data_index)
-    
+
     def _calculate_daily_sequence(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[pd.DataFrame, float, Dict]:
         """计算逐日序列指标 - 返回包含每日数据的DataFrame"""
         variable = config["variable"]
@@ -152,7 +213,6 @@ class IndicatorCalculator:
             # 返回多年平均值
             return float(period_data.mean()) if not period_data.empty else np.nan
 
-    
     def _calculate_stable_threshold_accumulation(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
         """计算稳定通过温度阈值的有效积温或降水累计 - 支持多种频率输出"""
         variable = config["variable"]
@@ -856,14 +916,14 @@ class IndicatorCalculator:
         start_date_str = config["start_date"]
         end_date_str = config["end_date"]
         variable = config["variable"]
-        # year_offset = config.get("year_offset", 0)
+        year_offset = config.get("year_offset", 0)
         
         if data.empty:
             return np.nan if frequency == "lta" else {}
 
         # 时间筛选
         if start_date_str and end_date_str:
-            period_mask = self._create_period_mask(data.index, start_date_str, end_date_str)
+            period_mask = self._create_period_mask(data.index, start_date_str, end_date_str, year_offset)
             period_data = data.loc[period_mask,variable]
             if period_data.empty:
                 return np.nan if frequency == "lta" else {}
@@ -903,8 +963,6 @@ class IndicatorCalculator:
         
         # # 使用掩码一次性计算所有年份的平均值
         # period_data = data.loc[period_mask, variable]
-
-
         
         if period_data.empty:
             return np.nan if frequency == "lta" else {}
@@ -1044,7 +1102,86 @@ class IndicatorCalculator:
         else:
             # 返回多年平均
             return float(yearly_extremes.mean()) if not yearly_extremes.empty else np.nan
-    
+
+    def _calculate_daily_range_mean(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[
+        float, Dict[int, float]]:
+        """
+        计算日较差（日最高温-日最低温）的平均值 - 支持多种频率输出
+
+        参数：
+            data: 包含tmax和tmin字段的DataFrame
+            config: 配置字典
+            frequency: 输出频率，"lta"或"yearly"
+
+        返回：
+            多年平均或逐年字典
+        """
+        try:
+            # 参数验证
+            required_fields = ['tmax', 'tmin']
+            for field in required_fields:
+                if field not in data.columns:
+                    print(f"错误：数据中缺少必要字段 '{field}'")
+                    return np.nan if frequency == "lta" else {}
+
+            # 获取配置参数
+            start_date_str = config.get("start_date")
+            end_date_str = config.get("end_date")
+
+            if not start_date_str or not end_date_str:
+                print("错误：配置中缺少start_date或end_date")
+                return np.nan if frequency == "lta" else {}
+
+            year_offset = config.get("year_offset", 0)
+
+            if data.empty:
+                return np.nan if frequency == "lta" else {}
+
+            # 创建时间段掩码
+            period_mask = self._create_period_mask(data.index, start_date_str, end_date_str, year_offset)
+
+            if not period_mask.any():
+                print(f"警告：时间段 {start_date_str} 到 {end_date_str} 内没有数据")
+                return np.nan if frequency == "lta" else {}
+
+            # 筛选时间段内的数据
+            period_data = data.loc[period_mask]
+
+            if period_data.empty:
+                return np.nan if frequency == "lta" else {}
+
+            # 计算日较差（最高温-最低温）
+            daily_range = period_data['tmax'] - period_data['tmin']
+
+            # 检查是否有有效数据
+            if daily_range.isna().all():
+                print("警告：所有日较差计算结果为NaN")
+                return np.nan if frequency == "lta" else {}
+
+            # 按年份分组计算每年平均值
+            yearly_means = daily_range.groupby(daily_range.index.year).mean()
+
+            # 清理无效值
+            yearly_means = yearly_means.dropna()
+
+            if frequency == "yearly":
+                # 返回逐年数据
+                result = yearly_means.to_dict()
+                # print(f"逐年日较差平均值: {result}")
+                return result
+            else:
+                # 返回多年平均
+                if yearly_means.empty:
+                    return np.nan
+
+                lta_mean = float(yearly_means.mean())
+                # print(f"多年平均日较差: {lta_mean:.2f}°C")
+                return lta_mean
+
+        except Exception as e:
+            print(f"计算日较差时发生错误: {str(e)}")
+            return np.nan if frequency == "lta" else {}
+
     def _calculate_conditional_sum(self, data: pd.DataFrame, config: Dict[str, Any], frequency: str = "lta") -> Union[float, Dict[int, float]]:
         """优化的条件累计计算 - 支持多种频率输出"""
         start_date_str = config["start_date"]
@@ -1241,20 +1378,25 @@ class IndicatorCalculator:
         
         if period_data.empty:
             return np.nan if frequency == "lta" else {}
-        
-        # 计算活动积温 - 使用向量化操作
+
+        # 计算活动积温 - 温度小于等于base_temp时为0，大于时取原温度值
         if method == "mean":
             # 使用日平均温度计算
-            daily_gdd = np.maximum(period_data["tavg"] - base_temp, 0)
+            daily_gdd = np.where(period_data["tavg"] > base_temp, period_data["tavg"], 0)
         elif method == "min_max":
             # 使用日最高最低温度计算
-            daily_gdd = np.maximum((period_data["tmax"] + period_data["tmin"]) / 2 - base_temp, 0)
+            daily_mean_temp = (period_data["tmax"] + period_data["tmin"]) / 2
+            daily_gdd = np.where(daily_mean_temp > base_temp, daily_mean_temp, 0)
         else:
             raise ValueError(f"不支持的积温计算方法: {method}")
-        
+
+        # 将numpy数组转换为pandas Series以便使用groupby
+        daily_gdd_series = pd.Series(daily_gdd, index=period_data.index)
+
         # 按年份分组计算每年积温
-        yearly_gdd = daily_gdd.groupby(period_data.index.year).sum()
+        yearly_gdd = daily_gdd_series.groupby(daily_gdd_series.index.year).sum()
         
+
         if frequency == "yearly":
             # 返回逐年数据
             return yearly_gdd.to_dict()

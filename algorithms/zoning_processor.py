@@ -77,11 +77,17 @@ class ZoningProcessor:
         )
         
         # 获取指标配置
-        if self.element:
-            self.algorithm_config = self.algorithm_config[self.element]
-            intermediate_filename = "intermediate_"+self.crop_code+"_"+self.element+".csv"
+        if config_key and "zoning_general_calculator" in config_key:
+            # 通用计算器模式：不按element提取配置
+            intermediate_filename = f"intermediate_{self.crop_code}_general.csv"
         else:
-            intermediate_filename = "intermediate"+self.crop_code+".csv"
+            # 特定元素模式：按element提取配置
+            if self.element:
+                self.algorithm_config = self.algorithm_config.get(self.element, {})
+                intermediate_filename = f"intermediate_{self.crop_code}_{self.element}.csv"
+            else:
+                intermediate_filename = f"intermediate_{self.crop_code}.csv"
+
 
         self.indicator_configs = self.algorithm_config.get("indicators")
         # 文件路径
@@ -358,9 +364,16 @@ class ZoningProcessor:
         
         # 根据 algoFrom 确定计算器名称
         if self.algo_from:
-            calculator_name = self.algo_from
-            class_name = f"{self.crop_code}_{self.zoning_type}"
-            self.fjson.log(f"使用配置算法: {calculator_name}")
+            if "zoning_general_calculator" in self.algo_from:
+                calculator_name = self.algo_from
+                class_name = self.algo_from.replace("zoning_general_calculator_", "", 1)
+                if not class_name or class_name == "zoning_general_calculator":
+                    class_name = "GenericZoningCalculator"
+                self.fjson.log(f"使用配置算法: {calculator_name}")
+            else:
+                calculator_name = self.algo_from
+                class_name = f"{self.crop_code}_{self.zoning_type}"
+                self.fjson.log(f"使用配置算法: {calculator_name}")
         else:
             calculator_name = "zoning_general_calculator"
             class_name = "GenericZoningCalculator"
@@ -507,7 +520,8 @@ class ZoningProcessor:
         # 写入结果到rjson
         if tif_path:
             self.rjson.info("result", [tif_path, "NYQH_NZW", "农作物气候区划", "QH", "TIFF"])
-                
+
+        # sys.exit(0) 服务器跳出
         # 生成PNG专题图
         png_filename = self._generate_output_filename("png")
         png_path = os.path.join(self.result_path, png_filename)

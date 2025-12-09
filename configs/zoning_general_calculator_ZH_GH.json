@@ -1,5 +1,4 @@
 {
-    "GH": {
         "indicators": {},
         "cwdi": {
             "kcMap": {
@@ -73,4 +72,3 @@
             "num_classes": 4
         }
     }
-}

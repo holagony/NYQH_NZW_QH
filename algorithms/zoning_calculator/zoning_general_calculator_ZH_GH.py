@@ -332,18 +332,16 @@ class ZH_GH:
         end_date = cfg.get('endDate')
         station_values: Dict[str, float] = {}
 
-        def _compute(sid):
+        # 单线程循环计算
+        for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             g = self.drought_station_g(daily, excel_path)
-            return sid, g
+            station_values[sid] = float(g) if np.isfinite(g) else np.nan
 
-        with ThreadPoolExecutor(max_workers=4) as ex:
-            for sid, g in ex.map(_compute, station_ids):
-                station_values[sid] = float(g) if np.isfinite(g) else np.nan
-
-        interp_conf = algorithm_config.get('interpolation')
+        algorithm_config = params.get('algorithmConfig', {})
+        interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
-        iparams = interp_conf.get('params')
+        iparams = interp_conf.get('params') or {}
 
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'

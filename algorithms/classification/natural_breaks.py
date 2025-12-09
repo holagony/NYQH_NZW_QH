@@ -82,11 +82,62 @@ class NaturalBreaksClassification():
         return result
 
     
+    # def _jenks_breaks(self, data: np.ndarray, num_classes: int) -> list:
+    #     """计算Jenks自然断点"""
+    #     # 对数据进行排序
+    #     sorted_data = np.sort(data)
+    #
+    #     # 使用分位数计算断点
+    #     breaks = []
+    #     for i in range(num_classes + 1):
+    #         quantile = i / num_classes
+    #         if quantile == 1.0:
+    #             idx = len(sorted_data) - 1
+    #         else:
+    #             idx = int(quantile * len(sorted_data))
+    #
+    #         if idx < len(sorted_data):
+    #             breaks.append(sorted_data[idx])
+    #
+    #     # 确保断点是唯一的
+    #     unique_breaks = []
+    #     for break_val in breaks:
+    #         if break_val not in unique_breaks:
+    #             unique_breaks.append(break_val)
+    #
+    #     # 如果断点数量不足，补充断点
+    #     while len(unique_breaks) < num_classes + 1:
+    #         if len(unique_breaks) == 0:
+    #             unique_breaks.append(np.min(data))
+    #         unique_breaks.append(np.max(data))
+    #         # 去重
+    #         unique_breaks = list(set(unique_breaks))
+    #         unique_breaks.sort()
+    #
+    #     return unique_breaks
     def _jenks_breaks(self, data: np.ndarray, num_classes: int) -> list:
         """计算Jenks自然断点"""
         # 对数据进行排序
         sorted_data = np.sort(data)
-        
+
+        # 如果数据值太少或全部相同，使用等间距断点
+        unique_values = np.unique(sorted_data)
+
+        if len(unique_values) <= num_classes:
+            # 数据不足，使用简单断点
+            if len(unique_values) == 1:
+                # 所有值相同，创建等间距断点
+                value = unique_values[0]
+                return [value - 0.1, value, value + 0.1][:num_classes + 1]
+            else:
+                # 使用现有唯一值作为断点，必要时补充
+                breaks = list(unique_values)
+                if len(breaks) < num_classes + 1:
+                    # 在最小值和最大值之间插入等间距断点
+                    min_val, max_val = np.min(data), np.max(data)
+                    breaks = list(np.linspace(min_val, max_val, num_classes + 1))
+                return breaks
+
         # 使用分位数计算断点
         breaks = []
         for i in range(num_classes + 1):
@@ -95,23 +146,23 @@ class NaturalBreaksClassification():
                 idx = len(sorted_data) - 1
             else:
                 idx = int(quantile * len(sorted_data))
-            
+
             if idx < len(sorted_data):
                 breaks.append(sorted_data[idx])
-        
+
         # 确保断点是唯一的
         unique_breaks = []
         for break_val in breaks:
             if break_val not in unique_breaks:
                 unique_breaks.append(break_val)
-        
-        # 如果断点数量不足，补充断点
-        while len(unique_breaks) < num_classes + 1:
-            if len(unique_breaks) == 0:
-                unique_breaks.append(np.min(data))
-            unique_breaks.append(np.max(data))
-            # 去重
-            unique_breaks = list(set(unique_breaks))
-            unique_breaks.sort()
-        
+
+        # 如果断点数量不足，使用等间距断点
+        if len(unique_breaks) < num_classes + 1:
+            min_val, max_val = np.min(data), np.max(data)
+            if min_val == max_val:
+                # 所有值相同，创建微小差异的断点
+                unique_breaks = list(np.linspace(min_val - 0.01, max_val + 0.01, num_classes + 1))
+            else:
+                unique_breaks = list(np.linspace(min_val, max_val, num_classes + 1))
+
         return unique_breaks
