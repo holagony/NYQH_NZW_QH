@@ -1,10 +1,9 @@
 {
-        "indicators": {},
-        "interpolation": {
-            "method": "lsm_idw"
-        },
-        "classification": {
-            "method": "natural_breaks",
-            "num_classes": 4
-        }
+    "start_date": "01-01",
+    "end_date": "12-31",
+    "year_offset": 0,
+    "indicators": {},
+    "interpolation": {
+        "method": "lsm_idw"
     }
+}
