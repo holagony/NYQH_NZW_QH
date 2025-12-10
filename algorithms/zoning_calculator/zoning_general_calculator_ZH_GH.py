@@ -180,7 +180,7 @@ class ZH_GH:
         band.FlushCache()
         dataset = None
 
-    def drought_station_g(self, data, excel_path):    
+    def drought_station_g(self, data, excel_path, config=None):    
         '''
         计算每个站点的干旱风险性
         
@@ -268,6 +268,32 @@ class ZH_GH:
             kc_excel)
 
         series = df["CWDI"] if "CWDI" in df.columns else pd.Series(dtype=float)
+        
+        # 增加对数据的时间范围筛选
+        start_date_str = config.get("start_date")
+        end_date_str = config.get("end_date")
+
+        # 检查跨年情况（保持原有逻辑）
+        start_date = pd.to_datetime(f"2000-{start_date_str}")
+        end_date = pd.to_datetime(f"2000-{end_date_str}")
+        if end_date < start_date:
+            year_offset = 1
+        else:
+            year_offset = 0
+
+        if start_date_str and end_date_str and not series.empty:
+            years = series.index.year.unique()
+            masks = []
+            for year in years:
+                start_dt = pd.to_datetime(f"{year}-{start_date_str}")
+                end_dt = pd.to_datetime(f"{year + year_offset}-{end_date_str}")
+                masks.append((series.index >= start_dt) & (series.index <= end_dt))
+            if masks:
+                mask = masks[0]
+                for m in masks[1:]:
+                    mask = mask | m
+                series = series[mask]
+
         years = sorted(series.index.year.unique())
         if not years:
             return np.nan
@@ -335,7 +361,7 @@ class ZH_GH:
         # 单线程循环计算
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
-            g = self.drought_station_g(daily, excel_path)
+            g = self.drought_station_g(daily, excel_path, algorithm_config)
             station_values[sid] = float(g) if np.isfinite(g) else np.nan
 
         algorithm_config = params.get('algorithmConfig', {})
