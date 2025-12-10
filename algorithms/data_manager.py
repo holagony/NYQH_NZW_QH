@@ -31,11 +31,8 @@ class DataManager:
             "TEM_Min": "tmin",
             "SSH": "sunshine",
             "RHU_Avg": "rhum",
-            "RHU_Min": "rhummin",
             "PRE_Time_2020": "precip",
             "WIN_S_2mi_Avg": "wind",
-            "WIN_S_Max":"windmax",
-            "Snow_Depth":"sd",
             "Station_Id_C": "station_id",
             "Lat": "lat",
             "Lon": "lon",
@@ -614,7 +611,7 @@ class DataManager:
         # data.iloc[:,1:]=targetdata.applymap(lambda x:x-999800 if (x>999800)&(x<999900) else x)
         # data.iloc[:,1:]=targetdata.applymap(lambda x:-999 if (x>1000)|(x<-1000) else x)
         
-        data = data.replace(["999999.0","999990.0", "999.0", "999999", "999998","-999999",-999999, 999999,999990,999998, 999, "999", np.nan, None],np.nan)
+        data = data.replace(["999999.0","999990.0", "999.0", "999999","-999999",-999999, 999999,999990,999998, 999, "999", np.nan, None],np.nan)
         data[(data.values>999600) & (data.values<999700)] = data - 999600
         data[(data.values>999700) & (data.values<999800)] = data - 999700
         data[(data.values>999800) & (data.values<999900)] = data - 999800
@@ -629,6 +626,7 @@ class DataManager:
         
         # 从文件加载数据（假设每个站点一个CSV文件）
         file_path = self.data_dir / f"{station_id}.csv"
+
         if not file_path.exists():
             # 尝试其他可能的文件扩展名
             file_path = self.data_dir / f"{station_id}.txt"
@@ -672,8 +670,7 @@ class DataManager:
         data = data.set_index('date')
         
         # 转换数值字段
-        numeric_columns = ['tavg', 'tmax', 'tmin', 'sunshine', 'rhum','rhummin', 'precip','wind','windmax','sd', 'lat', 'lon', 'altitude']
-
+        numeric_columns = ['tavg', 'tmax', 'tmin', 'sunshine', 'rhum', 'precip','wind', 'lat', 'lon', 'altitude']
         for col in numeric_columns:
             if col in data.columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce')

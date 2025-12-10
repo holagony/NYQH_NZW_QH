@@ -27,9 +27,18 @@
             "weight": 0.5
         }
     ],
+    "threshold_des":[
+        {"name_id":"level","name":"序号"},
+        {"name_id":"label","name":"等级"},
+        {"name_id":"min","name":"日数最小值(天)"},
+        {"name_id":"max","name":"日数最大值(天)"},
+        {"name_id":"weight","name":"权重"}
+    ],
+    "threshold_usage":"对于不同等级：日数最小值 < D ≤ 日数最大值, 不同等级权重相加为1。",
+    
     "formula": {
         "formula": "H=w1*occ_l+w2*occ_m+w3*occ_s",
-        "description": "w为各项权重，occ代表事件不出现的概率occ=1-p0,p0为不同程度高温热害连续时段出现的概率。"
+        "description": "w为权重系数，occ_l代表轻度高温热害事件不出现的概率，occ_m代表中度高温热害事件不出现的概率，occ_s代表重度高温热害事件不出现的概率。"
     },
     "interpolation": {
         "method": "lsm_idw"

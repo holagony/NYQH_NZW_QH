@@ -3,12 +3,13 @@
 """
 数据预处理模块 - 处理依赖数据的检验和裁剪
 """
-import os
+import os,glob
 import shutil
 from pathlib import Path
 from osgeo import ogr, gdal
 from typing import Dict, List, Optional, Tuple
 import numpy as np
+import geopandas as gpd
 
 class DataPreprocessor:
     """数据预处理器"""
@@ -135,6 +136,19 @@ class DataPreprocessor:
                 return True
             else:
                 raise ValueError(f"矢量文件验证失败: {shp_path}")
+  
+    def rePairIntersection(self,shpfile):
+        """
+        修复自相交
+        :param shpfile:
+        :return:
+        """
+        ds = gpd.read_file(shpfile)
+        for key, geom in ds.geometry.items():
+            # geom_ = geom.union(geom)
+            geom_ = geom.buffer(0)
+            ds.geometry[key] = geom_
+        ds.to_file(shpfile, driver="ESRI Shapefile", encoding="utf-8")
 
     def _extract_province_shp(self, target_path: str) -> Optional[str]:
         """从全国矢量文件中提取省份矢量"""
@@ -170,6 +184,8 @@ class DataPreprocessor:
                 region_list=[province_code]
             )
 
+            self.rePairIntersection(str(target_path))
+            
             if target_path.exists():
                 return str(target_path)
             else:
@@ -439,8 +455,9 @@ class DataPreprocessor:
             for shp_type, (national_file, field_name, output_file) in shp_types.items():
                 output_path = qgis_shp_dir / output_file
                 
+                national_path = self.depend_dir / "shp" / national_file
+                
                 if not output_path.exists():
-                    national_path = self.depend_dir / "shp" / national_file
                     if national_path.exists():
                         DataPreprocessor.shp_region_select_PAC(
                             in_shp=str(national_path),
@@ -448,10 +465,22 @@ class DataPreprocessor:
                             filed_name=field_name,
                             region_list=[province_code]
                         )
+                        self.rePairIntersection(str(output_path))
                         if output_path.exists():
                             self.fjson.log(f"生成QGIS {shp_type}矢量文件: {output_path}")
-                    # else:
-                    #     self.fjson.log(f"全国{shp_type}文件不存在: {national_path}")
+                    else:
+                        raise FileNotFoundError(f"无法找到矢量文件: {national_file}")
+                            
+                if (shp_type == "shi") | (shp_type == "xian"):
+                    # 查找所有匹配的文件
+                    source_pattern = os.path.join(str(qgis_shp_dir), Path(str(output_path)).stem)
+                    matching_files = glob.glob(source_pattern+".*")
+                    
+                    # 复制每个文件
+                    for source_file in matching_files:
+                        dest_file = os.path.join(str(qgis_shp_dir), os.path.basename(source_file).replace(shp_type,shp_type+"_copy"))
+                        if not os.path.exists(dest_file):
+                            shutil.copy2(source_file, dest_file)
                         
         except Exception as e:
             self.fjson.log(f"准备QGIS矢量文件失败: {str(e)}")
@@ -545,6 +574,7 @@ class DataPreprocessor:
                 self.fjson.log(f"省份矢量文件不存在，无法裁剪格网")
                 return None
             
+            self.rePairIntersection(shp_file)
             # 创建输出目录
             target_path.parent.mkdir(parents=True, exist_ok=True)
             
