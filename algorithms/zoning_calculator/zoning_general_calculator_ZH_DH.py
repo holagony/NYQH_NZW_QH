@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-# 冻害（DH）通用计算器：统计 tmin 满足阈值的日数，
+# 越冬冻害（YDDH）通用计算器：统计 tmin 满足阈值的日数，
 # 信息扩散法得到“日数为0”的概率 p0，取互补 occ=1-p0，
 # 按配置权重加权得到站点危险性指数 H，随后插值与分级。
 from algorithms.data_manager import DataManager
@@ -122,14 +122,7 @@ class ZH_DH:
 
         start_date_str = conf.get("start_date")
         end_date_str = conf.get("end_date")
-        
-        # 检查跨年情况（保持原有逻辑）
-        start_date = pd.to_datetime(f"2000-{start_date_str}")
-        end_date = pd.to_datetime(f"2000-{end_date_str}")
-        if end_date < start_date:
-            year_offset_conf = 1
-        
-        # year_offset_conf = conf.get("year_offset")
+        year_offset_conf = conf.get("year_offset")
         year_offset = int(year_offset_conf) if year_offset_conf is not None else 0
 
         years = sorted(data.index.year.unique())
