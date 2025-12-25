@@ -1,0 +1,23 @@
+{
+  "taskId": "123456",
+  "algoFrom": "zoning_360000_CITR_ZH",
+  "cropCode": "CITR",
+  "zoningType": "ZH",
+  "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
+  "areaCode": "360000",
+  "areaName": "内蒙古自治区",
+  "element": "GSPDQGWRH",
+  "startDate": "19910101",
+  "endDate": "20201231",
+  "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/360000_30grid_wgs84.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_360000.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/360000_wgs84.shp",
+  "otherFilesPath": "",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_GSPDQGWRH/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_GSPDQGWRH/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_GSPDQGWRH/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_GSPDQGWRH",
+  "algorithmConfig": {},
+  "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend"
+}

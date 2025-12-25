@@ -1,0 +1,89 @@
+
+{
+    "indicators": {
+        "T1": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "09-11",
+            "end_date": "09-20",
+            "variable": "tavg"
+        },
+        "R1": {
+            "type": "period_sum", 
+            "frequency": "lta",
+            "start_date": "09-11",
+            "end_date": "09-20",
+            "variable": "precip"
+        },
+        "D1": {
+            "type": "conditional_count",
+            "frequency": "lta", 
+            "start_date": "12-01",
+            "end_date": "02-28",
+            "year_offset": 1,
+            "conditions": [
+                {
+                    "variable": "tmin",
+                    "operator": "<=",
+                    "value": -30
+                }
+            ]
+        },
+        "T2": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "05-01", 
+            "end_date": "06-30",
+            "variable": "tavg"
+        },
+        "D2": {
+            "type": "conditional_count",
+            "frequency": "lta",
+            "start_date": "07-15",
+            "end_date": "08-31", 
+            "conditions": [
+                {
+                    "variable": "tavg",
+                    "operator": "between",
+                    "value": [20, 25]
+                },
+                {
+                    "variable": "rhum",
+                    "operator": "between", 
+                    "value": [75, 100]
+                }
+            ]
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "0.4631 * X1 + 0.2127 * X2 + 0.2468 * X3 + 0.0774 * X4",
+        "variables": {
+            "X1": {"ref": "X1"},
+            "X2": {"ref": "X2"},
+            "X3": {"ref": "X3"},
+            "X4": {"ref": "X4"}
+        }
+    },
+    "interpolation": {
+        "method": "lsm_idw",
+        "order":"after",
+        "params": {
+            "block_size": 256,
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "nodata":0
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes":4,
+        "thresholds": [
+            {"level": 4, "label": "低发生区", "max": 1.0},
+            {"level": 3, "label": "中发生区", "min": 1.0, "max": 1.5},
+            {"level": 2, "label": "高发生区", "min": 1.5, "max": 2.0},
+            {"level": 1, "label": "极高发生区", "min": 2.0}
+        ]
+    }
+}

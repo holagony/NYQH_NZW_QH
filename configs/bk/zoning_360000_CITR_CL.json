@@ -1,0 +1,98 @@
+{
+    "QXCL": {
+        "indicators": {
+            "X1": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "year_offset": 1,
+                "start_date": "12-01",
+                "end_date": "02-28",
+                "variable": "precip"
+            },
+            "X2": {
+                "type": "period_mean",
+                "frequency": "lta",
+                "start_date": "03-01",
+                "end_date": "04-10",
+                "variable": "tavg"
+            },
+            "X3": {
+                "type": "period_mean",
+                "frequency": "lta",
+                "start_date": "04-11",
+                "end_date": "06-20",
+                "variable": "tavg"
+            },
+            "X4": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "06-21",
+                "end_date": "09-30",
+                "variable": "precip"
+            },
+            "X5": {
+                 "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "10-01",
+                "end_date": "11-30",
+                "variable": "sunshine"
+            }
+         },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "w6+w1*X1+w2*X2+w3*X3+w4*X4+w5*X5+w7*X2*X3+w8*X2*X4+w9*X3*X4+w10*X2*X2+w11*X3*X3+w12*X4*X4",
+            "weight": {
+                "w6": -8854.1,
+                "w1": -0.0023,
+                "w2": 241.5274,
+                "w3": 563.6836,
+                "w4": 1.3789,
+                "w5": -0.0015,
+                "w7": -14.2629,
+                "w8": 0.057,
+                "w9": -0.0942,
+                "w10": 2.3543,
+                "w11": -6.3202,
+                "w12": -0.000162
+            },
+            "variables": {
+                "X1": {
+                    "value":{"ref": "X1"}
+                },
+                "X2": {
+                    "value":{"ref": "X2"}
+                },
+                "X3": {
+                    "value":{"ref": "X3"}
+                },
+                "X4": {
+                    "value":{"ref": "X4"}
+                },
+                "X5": {
+                    "value":{"ref": "X5"}
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw",
+            "params": {
+                "radius_dist": 5.0,
+                "min_num": 10,
+                "first_size": 100,
+                "var_name": "suitability"
+            }
+        },
+        "classification": {
+            "method": "custom_thresholds",
+            "num_classes":4,
+            "thresholds": [
+            {"min": 0,"max": 0.81, "level": 4, "label": "低产区"},
+            {"min": 0.81, "max": 0.87, "level": 3, "label": "中产区"},
+            {"min": 0.87, "max": 0.91, "level": 2, "label": "中高产区"},
+            {"min": 0.91, "max": 1,"level": 1, "label": "高产区"}
+            ]
+        }
+    }
+}
+

@@ -1,0 +1,34 @@
+{
+    "GSPDQGWRH": {
+        "indicators": {},
+        "hazard": {
+            "start_date": "01-01",
+            "end_date": "12-31",
+            "year_offset": 0,
+            "aggregation": "mean"
+        },
+        "interpolation": {
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "natural_breaks",
+            "num_classes": 4
+        }
+    },
+    "YDDH": {
+        "indicators": {},
+        "hazard": {
+            "start_date": "12-01",
+            "end_date": "02-28",
+            "year_offset": 1,
+            "aggregation": "mean"
+        },
+        "interpolation": {
+            "method": "lsm_idw"
+        },
+        "classification": {
+            "method": "natural_breaks",
+            "num_classes": 4
+        }
+    }
+}

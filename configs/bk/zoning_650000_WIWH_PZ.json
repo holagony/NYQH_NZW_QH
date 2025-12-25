@@ -1,0 +1,195 @@
+{
+    "ZLRZ": {
+        "indicators": {
+            "SUN": {
+                "type": "daily_sequence",
+                "frequency": "daily",
+                "start_date": "05-01",
+                "end_date": "07-10",
+                "variable": "sunshine"
+            },
+            "Tmax": {
+                "type": "daily_sequence",
+                "frequency": "daily",
+                "start_date": "05-01",
+                "end_date": "07-10",
+                "variable": "tmax"
+            },
+            "Tavg": {
+                "type": "daily_sequence",
+                "frequency": "daily",
+                "start_date": "05-01",
+                "end_date": "07-10",
+                "variable": "tavg"
+            }
+         },
+        "nanjiang_beijiang": {
+            "北疆": {
+                "start_date": "05-11",
+                "end_date": "07-10",
+                "area": [
+                "昌吉回族自治州",
+                "伊犁哈萨克自治州",
+                "塔城地区",
+                "阿勒泰地区",
+                "哈密市",
+                "乌鲁木齐市",
+                "博尔塔拉蒙古自治州",
+                "克拉玛依市",
+                "石河子市",
+                "五家渠市"
+            ]
+            },
+            "南疆": {
+                "start_date": "05-01",
+                "end_date": "06-30",
+                "area": [
+                "巴音郭楞蒙古自治州",
+                "喀什地区",
+                "阿克苏地区",
+                "和田地区",
+                "克孜勒苏柯尔克孜自治州",
+                "吐鲁番市",
+                "阿拉尔市"
+            ]
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "w1*x1+w2*x2+w3*x3+w4",
+            "weight": {
+                "w1": 0.1227,
+                "w2": 0.731,
+                "w3": -2.39,
+                "w4": 764.1
+            },
+            "variables": {
+                "x1": {
+                    "value":{"ref": "SUN"}
+                },
+                "x2": {
+                    "value":{"ref": "Tmax30D"}
+                },
+                "x3": {
+                    "value":{"ref": "Tave"}
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw",
+            "params": {
+                "radius_dist": 2.5,
+                "min_num": 8,
+                "first_size": 150
+            }
+        },
+        "classification": {
+            "method": "custom_thresholds",
+            "num_classes":4,
+            "thresholds": [
+            {"max": 780, "level": 4, "label": "一般"},
+            {"min": 780, "max": 785, "level": 3, "label": "良"},
+            {"min": 785, "max": 790, "level": 2, "label": "优"},
+            {"min": 790, "level": 1, "label": "特优"}
+            ]
+        }
+    },
+    "DBZHL": {
+        "indicators": {
+            "SUN": {
+                "type": "daily_sequence",
+                "frequency": "daily",
+                "start_date": "05-01",
+                "end_date": "07-10",
+                "variable": "sunshine"
+            },
+            "Tmax": {
+                "type": "daily_sequence",
+                "frequency": "daily",
+                "start_date": "05-01",
+                "end_date": "07-10",
+                "variable": "tmax"
+            },
+            "Tavg": {
+                "type": "daily_sequence",
+                "frequency": "daily",
+                "start_date": "05-01",
+                "end_date": "07-10",
+                "variable": "tavg"
+            }
+        },
+        "nanjiang_beijiang": {
+            "北疆": {
+                "start_date": "05-11",
+                "end_date": "07-10",
+                "area": [
+                "昌吉回族自治州",
+                "伊犁哈萨克自治州",
+                "塔城地区",
+                "阿勒泰地区",
+                "哈密市",
+                "乌鲁木齐市",
+                "博尔塔拉蒙古自治州",
+                "克拉玛依市",
+                "石河子市",
+                "五家渠市"
+            ]
+            },
+            "南疆": {
+                "start_date": "05-01",
+                "end_date": "06-30",
+                "area": [
+                "巴音郭楞蒙古自治州",
+                "喀什地区",
+                "阿克苏地区",
+                "和田地区",
+                "克孜勒苏柯尔克孜自治州",
+                "吐鲁番市",
+                "阿拉尔市"
+            ]
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "w1*x1+w2*x2+w3*x3+w4",
+             "weight": {
+                "w1": 0.0068,
+                "w2": -0.939,
+                "w3": 0.1189,
+                "w4": 27.38
+            },
+            "variables": {
+                "x1": {
+                    "value":{"ref": "SUN"}
+                },
+                "x2": {
+                    "value":{"ref": "Tmax"}
+                },
+                "x3": {
+                    "value":{"ref": "Tmax32D"}
+                }
+            }
+        },
+        "interpolation": {
+            "order": "after",
+            "method": "lsm_idw",
+            "params": {
+                "radius_dist": 2.5,
+                "min_num": 8,
+                "first_size": 150
+            }
+        },
+        "classification": {
+            "method": "custom_thresholds",
+            "num_classes":4,
+            "thresholds": [
+            {"max": 12.5, "level": 4, "label": "一般"},
+            {"min": 12.5, "max": 13, "level": 3, "label": "良"},
+            {"min": 13, "max": 13.5, "level": 2, "label": "优"},
+            {"min": 13.5, "level": 1, "label": "特优"}
+            ]
+        }
+    }
+}
+

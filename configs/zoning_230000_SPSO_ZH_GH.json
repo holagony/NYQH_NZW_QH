@@ -1,0 +1,21 @@
+
+{
+    "indicators": {},
+    "cwdi": {
+        "weights": [
+            0.3,
+            0.25,
+            0.2,
+            0.15,
+            0.1
+        ],
+        "start_date": "01-01",
+        "end_date": "12-31",
+        "year_offset": 0,
+        "aggregation": "mean"
+    },
+    "interpolation": {
+        "order": "after",
+        "method": "lsm_idw"
+    }
+}

@@ -1,0 +1,23 @@
+{
+  "taskId": "123456",
+  "algoFrom": "zoning_general_calculator_ZH_LCY",
+  "cropCode": "WIWH",
+  "zoningType": "ZH",
+  "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
+  "areaCode": "410000",
+  "areaName": "河南省",
+  "element": "LCY",
+  "startDate": "19910101",
+  "endDate": "20201231",
+  "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
+  "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/410000_30grid_wgs84.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_410000.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/410000_wgs84.shp",
+  "otherFilesPath": "",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_lcy/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_lcy/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_lcy/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_WIWH/ZH_lcy",
+  "algorithmConfig": {}
+}

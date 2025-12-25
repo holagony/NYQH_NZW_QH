@@ -1,0 +1,18 @@
+{
+  "indicators": {},
+  "evaluation": {
+    "weights": { "lat": 0.2, "alt": 0.2, "heat": 0.3, "risk": 0.3 }
+  },
+  "heat_interpolation": {
+    "method": "lsm_idw",
+    "params": { "block_size": 256, "radius_dist": 5.0, "min_num": 10, "first_size": 100, "nodata": 0 }
+  },
+  "risk_interpolation": {
+    "method": "idw",
+    "params": { "block_size": 256, "radius_dist": 5.0, "min_num": 10, "first_size": 100, "nodata": 0 }
+  },
+  "classification": {
+    "method": "natural_breaks",
+    "num_classes": 4
+  }
+}

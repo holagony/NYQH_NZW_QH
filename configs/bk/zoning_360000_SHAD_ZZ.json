@@ -1,0 +1,48 @@
+{
+    "QHSYX": {
+        "indicators": {
+            "AT10": {
+                "type": "growing_degree_days",
+                "frequency": "lta",
+                "start_date": "01-01",
+                "end_date": "12-31",
+                "variable": "tavg"
+            },
+            "Tmin": {
+                "type": "period_extreme",
+                "extreme_type": "min",
+                "frequency": "lta",
+                "start_date": "01-01",
+                "end_date": "12-31",
+                "variable": "tmin"
+            }
+        },
+        "interpolation": {
+            "order": "before",
+            "method": "lsm_idw",
+            "params": {
+                "block_size": 256,
+                "radius_dist": 5.0,
+                "min_num": 10,
+                "first_size": 100,
+                "nodata": 0
+            }
+        },
+        "classification": {
+            "method": "custom_thresholds",
+            "thresholds_AT10": [
+            {"min": "","max": 5200, "level": 4, "label": "不适宜区"},
+            {"min": 5200, "max": 5500, "level": 3, "label": "次适宜区"},
+            {"min": 5500, "max": 5800, "level": 2, "label": "适宜区"},
+            {"min": 5800, "max": "","level": 1, "label": "最适宜区"}
+            ],
+            "thresholds_Tmin": [
+            {"min": "","max": -9, "level": 4, "label": "不适宜区"},
+            {"min": -9, "max": -7, "level": 3, "label": "次适宜区"},
+            {"min": -7, "max": -5, "level": 2, "label": "适宜区"},
+            {"min": -5, "max": "","level": 1, "label": "最适宜区"}
+            ]
+        }
+    }
+}
+

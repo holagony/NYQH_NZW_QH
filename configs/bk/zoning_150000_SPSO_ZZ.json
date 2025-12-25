@@ -1,0 +1,69 @@
+{
+    "QHSYX":
+    {
+        "interpolation": {
+            "method": "lsm_idw",
+            "order":"after",
+            "params": {
+                "radius_dist": 5.0,
+                "min_num": 10,
+                "first_size": 100,
+                "var_name": "suitability"
+            }
+        },
+
+        "indicators": {
+            "a": {
+                "type": "stable_threshold_accumulation",
+                "start_date": "01-01",
+                "end_date": "12-31",
+                "frequency": "lta",
+                "base_temp": 10,
+                "variable":"tavg"
+            },
+            "b": {
+                "type": "period_sum",
+                "frequency": "lta",
+                "start_date": "05-01",
+                "end_date": "09-30",
+                "variable": "precip"
+            },
+            "c": {
+                "type": "period_mean",
+                "frequency": "lta",
+                "start_date": "07-15",
+                "end_date": "08-15",
+                "variable": "tavg"
+            }
+        },
+        "formula": {
+            "type": "custom_formula",
+            "formula": "0.3 * a_std + 0.5 * b_std + 0.2 * c_std",
+            "variables": {
+                "a_std": {
+                    "type": "standardize",
+                    "value": {"ref": "a"}
+                },
+                "b_std": {
+                    "type": "standardize",
+                    "value": {"ref": "b"}
+                },
+                "c_std": {
+                    "type": "standardize",
+                    "value": {"ref": "c"}
+                }
+            }
+        },
+
+        "classification": {
+            "method": "custom_thresholds",
+            "num_classes":4,
+            "thresholds": [
+                {"level": 4, "label": "不适宜区","min":"", "max": 0.6},
+                {"level": 3, "label": "次适宜区", "min": 0.6, "max": 0.65},
+                {"level": 2, "label": "适宜区", "min": 0.65, "max": 0.7},
+                {"level": 1, "label": "最适宜区", "min": 0.7,"max":""}
+            ]
+        }
+    }
+}

@@ -1,0 +1,81 @@
+{
+    "indicators": {
+        "Tmax": {
+            "type": "period_extreme",
+            "extreme_type": "max",
+            "frequency": "lta",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "variable": "tmax"
+        },
+        "Tmean": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "variable": "tavg"
+        },
+        "Pred": {
+            "type": "conditional_count",
+            "frequency": "lta",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "conditions": [
+                {
+                    "variable": "precip",
+                    "operator": ">=",
+                    "value": 0.1
+                }
+            ]
+        },
+        "RH": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "variable": "rhum"
+        },
+        "N32": {
+            "type": "conditional_count",
+            "frequency": "lta",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "conditions": [
+                {
+                    "variable": "tmax",
+                    "operator": ">=",
+                    "value": 32
+                }
+            ]
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "15.537 + 1.652 * X1 - 1.179 * X2 - 0.316 * X3 - 0.115 * X4 - 0.286 * X5",
+        "variables": {
+            "X1": {
+                "ref": "Tmax"
+            },
+            "X2": {
+                "ref": "Tmean"
+            },
+            "X3": {
+                "ref": "Pred"
+            },
+            "X4": {
+                "ref": "RH"
+            },
+            "X5": {
+                "ref": "N32"
+            }
+        }
+    },
+    "interpolation": {
+        "order": "after",
+        "method": "lsm_idw"
+    },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+    }
+}

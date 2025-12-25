@@ -1,0 +1,65 @@
+{
+    "indicators": {
+        "P1": {
+            "type": "period_sum",
+            "frequency": "yearly",
+            "start_date": "04-01",
+            "end_date": "04-05",
+            "variable": "precip"
+        },
+        "H1": {
+            "type": "period_sum",
+            "frequency": "yearly",
+            "start_date": "04-16",
+            "end_date": "04-20",
+            "variable": "sunshine"
+        },
+        "H2": {
+            "type": "period_sum",
+            "frequency": "yearly",
+            "start_date": "05-11",
+            "end_date": "05-15",
+            "variable": "sunshine"
+        },
+        "P2": {
+            "type": "period_sum",
+            "frequency": "yearly",
+            "start_date": "05-11",
+            "end_date": "05-15",
+            "variable": "precip"
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "standardize": "True",
+        "formula": "0.2*P1-0.32*H1-0.43*H2-0.05*P2",
+        "variables": {
+            "P1": {
+                "ref": "P1"
+            },
+            "H1": {
+                "ref": "H1"
+            },
+            "H2": {
+                "ref": "H2"
+            },
+            "P2": {
+                "ref": "P2"
+            }
+        }
+    },
+    "interpolation": {
+        "order": "after",
+        "method": "lsm_idw"
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "thresholds": [
+        {"min": "","max": 0.5, "level": 4, "label": "低风险"},
+        {"min": 0.5, "max": 0.65, "level": 3, "label": "中风险"},
+        {"min": 0.65, "max": 0.8, "level": 2, "label": "高风险"},
+        {"min": 0.8, "max": "","level": 1, "label": "极高风险"}
+        ]
+    }
+}
+

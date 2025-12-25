@@ -1,0 +1,44 @@
+{
+    "indicators": {
+        "D": {
+            "type": "conditional_count",
+            "frequency":"lta",  
+            "start_date": "07-15",
+            "end_date": "08-15",
+            "conditions": [
+                {
+                    "variable": "tavg",
+                    "operator": "between",
+                    "value": [20, 25]
+                },
+                {
+                    "variable": "rhum",
+                    "operator": ">",
+                    "value": 80
+                }
+            ]
+        }
+    },
+    "formula": {"ref": "D"},
+    "interpolation": {
+        "method": "idw",
+        "order":"after",
+        "params": {
+            "block_size": 256,
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "nodata":0
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes":4,
+        "thresholds": [
+        {"min": "","max": 3, "level": 4, "label": "低风险"},    
+        {"min": 3, "max": 6, "level": 3, "label": "中风险"},  
+        {"min": 6, "max": 9, "level": 2, "label": "高风险"},  
+        {"min": 9, "max": "","level": 1, "label": "极高风险"}   
+        ]
+    }
+}

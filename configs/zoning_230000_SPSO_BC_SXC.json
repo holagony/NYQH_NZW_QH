@@ -1,0 +1,96 @@
+{
+    "indicators": {
+        "T9": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "year_offset": -1,
+            "start_date": "09-21",
+            "end_date": "09-30",
+            "variable": "tavg"
+        },
+        "T12": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "year_offset": -1,
+            "start_date": "12-01",
+            "end_date": "12-31",
+            "variable": "tavg"
+        },
+        "T4": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "04-01",
+            "end_date": "04-10",
+            "variable": "tavg"
+        },
+        "T5_6": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "05-01",
+            "end_date": "06-30",
+            "variable": "tavg"
+        },
+        "H8": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "08-01",
+            "end_date": "08-31",
+            "variable": "rhum"
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "w1*T9+w2*T12+w3*T4+w4*T5_6+w5*H8",
+            "weight": {
+            "w1": 0.154,
+            "w2": 0.113,
+            "w3": 0.066,
+            "w4": 0.357,
+            "w5": 0.311
+
+        },
+        "variables": {
+            "T9": {
+                "type": "standardize",
+                "value":{"ref": "T9"}
+            },
+            "T12": {
+                "type": "standardize",
+                "value":{"ref": "T12"}
+            },
+            "T4": {
+                "type": "standardize",
+                "value":{"ref": "T4"}
+            },
+            "T5_6": {
+                "type": "standardize",
+                "value":{"ref": "T5_6"}
+            },
+            "H8": {
+                "type": "standardize",
+                "value":{"ref": "H8"}
+            }
+        }
+    },
+    "interpolation": {
+        "order": "before",
+        "method": "lsm_idw",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes":4,
+        "thresholds": [
+        {"min": 0,"max": 0.47, "level": 4, "label": "低风险"},
+        {"min": 0.48, "max": 0.58, "level": 3, "label": "中风险"},
+        {"min": 0.59, "max": 0.68, "level": 2, "label": "高风险"},
+        {"min": 0.69, "max": 1,"level": 1, "label": "极高风险"}
+        ]
+    }
+}
+

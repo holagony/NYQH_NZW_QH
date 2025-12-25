@@ -1,0 +1,49 @@
+{
+    "interpolation": {
+        "method": "lsm_idw",
+        "params": {
+            "radius_dist": 10.0,
+            "min_num": 5,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "indicators": {
+        "tavg": {
+            "type": "daily_sequence",
+            "frequency":"daily",  
+            "start_date": "10-01",
+            "end_date": "05-30",
+            "variable": "tavg",
+            "description": "平均气温"
+        },
+        "precip": {
+            "type": "daily_sequence",
+            "frequency":"daily",  
+            "start_date": "10-01",
+            "end_date": "05-30",
+            "variable": "precip",
+            "description": "日降水量"
+        },
+        "ET0": {
+            "type": "fao_pet",
+            "frequency":"daily",  
+            "start_date": "10-01",
+            "end_date": "05-30",
+            "description": "蒸散发"
+        },
+        "Rs": {
+            "type": "total_radiation",
+            "frequency":"daily",  
+            "start_date": "10-01",
+            "end_date": "05-30",
+            "description": "太阳辐射"
+        }
+    },
+    "formula": { },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes":4,
+        "thresholds": []
+    }
+}

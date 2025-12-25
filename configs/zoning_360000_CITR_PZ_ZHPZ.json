@@ -1,0 +1,72 @@
+{
+    "indicators": {
+        "S1_3": {
+            "type": "period_sum",
+            "frequency": "lta",
+            "start_date": "06-01",
+            "end_date": "06-30",
+            "variable": "sunshine"
+        },
+        "Z4_11": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "07-01",
+            "end_date": "09-20",
+            "variable": "tmax"
+        },
+        "Z12_15": {
+            "type": "period_mean",
+            "frequency": "lta",
+            "start_date": "09-21",
+            "end_date": "10-31",
+            "variable": "tmax"
+        }
+        },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "w1*S1_3+w2*Z4_11+w3*Z12_15+w4",
+            "weight": {
+            "w1": 0.002,
+            "w2": -0.060,
+            "w3": 0.050,
+            "w4": 0.881
+
+        },
+        "variables": {
+            "S1_3": {
+                "type": "standardize",
+                "value":{"ref": "S1_3"}
+            },
+            "Z4_11": {
+                "type": "standardize",
+                "value":{"ref": "Z4_11"}
+            },
+            "Z12_15": {
+                "type": "standardize",
+                "value":{"ref": "Z12_15"}
+            }
+        }
+    },
+    "interpolation": {
+        "order": "after",
+        "method": "lsm_idw",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes":4,
+        "thresholds": [
+        {"max": 0.4, "level": 4, "label": "一般"},
+        {"min": 0.4, "max": 0.42, "level": 3, "label": "良"},
+        {"min": 0.42, "max": 0.45, "level": 2, "label": "优"},
+        {"min": 0.45, "level": 1, "label": "特优"}
+        ]
+    }
+}
+
+
