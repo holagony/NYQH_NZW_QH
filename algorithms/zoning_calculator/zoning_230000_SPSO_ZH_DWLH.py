@@ -340,7 +340,7 @@ class SPSO_ZH:
                 classifier = self._get_algorithm(f"classification.{method}")
                 data_out = classifier.execute(data_out.astype(float), class_conf)
             except Exception:
-                data_out = result
+                data_out = result['data']
             class_tif = os.path.join(config.get("resultPath"), "低温冷害危险性指数_分级.tif")
             self._save_geotiff_gdal(data_out.astype(np.int16), result['meta'], class_tif, 0)
 
