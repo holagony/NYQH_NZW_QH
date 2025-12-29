@@ -159,9 +159,8 @@ class SPMA_ZH:
         else:
             norm = grid
         norm[~mask] = np.nan
-        mean_days_tif = os.path.join(cfg.get("resultPath"), "intermediate", "大风倒伏强风日数多年均值.tif")
-        self._save_geotiff_gdal(grid, interp['meta'], mean_days_tif, nodata)
-        norm_tif = os.path.join(cfg.get("resultPath"), "intermediate", "大风倒伏强风日数多年均值_归一化.tif")
+
+        norm_tif = os.path.join(cfg.get("resultPath"), "intermediate", "大风倒伏风险.tif")
         self._save_geotiff_gdal(norm, interp['meta'], norm_tif, nodata)
 
         class_conf = algorithm_config.get('classification', {})
@@ -173,8 +172,11 @@ class SPMA_ZH:
                 data_out = classifier.execute(interp['data'].astype(float), class_conf)
             except Exception:
                 data_out = interp['data']
+            class_tif = os.path.join(cfg.get("resultPath"), "大风倒伏风险_分级.tif")
+            self._save_geotiff_gdal(data_out.astype(np.int16), interp['meta'], class_tif, nodata)
         meta = interp['meta']
-        return {'data': data_out.astype(np.int16) if data_out.dtype != np.int16 else data_out,
+
+        return {'data': data_out.astype(np.int16),
                 'meta': {'width': meta['width'], 'height': meta['height'], 'transform': meta['transform'], 'crs': meta['crs']},
                 'type': '辽宁春玉米大风倒伏'}
 
