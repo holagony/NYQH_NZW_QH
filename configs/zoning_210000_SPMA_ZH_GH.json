@@ -1,0 +1,7 @@
+
+{
+    "indicators": {},
+    "interpolation": {
+        "method": "lsm_idw"
+    }
+}
