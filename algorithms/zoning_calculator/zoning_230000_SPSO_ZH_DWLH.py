@@ -38,6 +38,11 @@ class SPSO_ZH:
     '''
     黑龙江-大豆-灾害区划-大豆冷害
     '''
+    def _get_algorithm(self, algorithm_name):
+        """从算法注册器获取实例（插值/分类等）"""
+        if algorithm_name not in self._algorithms:
+            raise ValueError(f"不支持的算法: {algorithm_name}")
+        return self._algorithms[algorithm_name]
 
     def _save_geotiff_gdal(self, data, meta, output_path, nodata=0):
         """保存GeoTIFF文件"""

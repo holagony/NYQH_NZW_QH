@@ -1,4 +1,3 @@
-
 {
     "indicators": {},
     "cwdi": {
@@ -15,7 +14,10 @@
         "aggregation": "mean"
     },
     "interpolation": {
-        "order": "after",
         "method": "lsm_idw"
+    },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
     }
 }

@@ -1,6 +1,6 @@
 {
   "taskId": "123456",
-  "algoFrom": "zoning_230000_SPSO_ZH",
+  "algoFrom": "zoning_230000_SPSO_ZH_GH",
   "cropCode": "SPSO",
   "zoningType": "ZH",
   "inputFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\inputdata\\tianqing_stn",
@@ -14,9 +14,9 @@
   "demFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\depend\\dem\\china_dem_230000.tif",
   "shpFilePath": "C:\\Users\\MJY\\Desktop\\NYQH\\depend\\shp\\230000_wgs84.shp",
   "otherFilesPath": "",
-  "resultLogPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_GH\\resultLogFile.json",
-  "resultJsonPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_GH\\resultJsonFile.json",
-  "resultFlowPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_GH\\resultFlowFile.json",
-  "resultPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\test\\230000_WIWH_ZH_GH",
+  "resultLogPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\20251229\\230000_SPSO_ZH_GH\\resultLogFile.json",
+  "resultJsonPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\20251229\\230000_SPSO_ZH_GH\\resultJsonFile.json",
+  "resultFlowPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\20251229\\230000_SPSO_ZH_GH\\resultFlowFile.json",
+  "resultPath": "C:\\Users\\MJY\\Desktop\\NYQH\\output\\20251229\\230000_SPSO_ZH_GH",
   "algorithmConfig": {}
 }
