@@ -1,4 +1,5 @@
 import os
+from re import S
 import numpy as np
 import pandas as pd
 from math import pi
@@ -297,7 +298,7 @@ class SPSO_ZH:
 
         # 危险性G插值
         interp_conf = algorithm_config.get('interpolation')
-        method = str(interp_conf.get('method', 'idw')).lower()
+        method = str(interp_conf.get('method', 'lsm_idw')).lower()
         iparams = interp_conf.get('params', {})
 
         if 'var_name' not in iparams:
@@ -316,11 +317,13 @@ class SPSO_ZH:
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
             result = IDWInterpolation().execute(interp_data, iparams)
-        
+        print(f"插值后数值范围: {np.nanmin(result['data']):.4f} ~ {np.nanmax(result['data']):.4f}")
+
         # 数值设置 + tiff保存
         # result['data'] = np.maximum(result['data'], 0)
         # result['data'] = np.where(np.isnan(result['data']), 0, result['data'])  # 将NaN也设为0
         result['data'] = normalize_array(result['data']) # 归一化
+
         g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱危险性指数.tif")
         self._save_geotiff(result['data'], result['meta'], g_tif_path, 0)
 
@@ -332,15 +335,18 @@ class SPSO_ZH:
         czt_array = self._align_and_read_input(grid_path, czt_path, cfg.get('resultPath'))
         yzhj_array = self._align_and_read_input(grid_path, yzhj_path, cfg.get('resultPath'))
         fzjz_array = self._align_and_read_input(grid_path, fzjz_path, cfg.get('resultPath'))
-        # czt_array = np.nan_to_num(czt_array, nan=0.0)
-        # yzhj_array = np.nan_to_num(yzhj_array, nan=0.0)
-        # fzjz_array = np.nan_to_num(fzjz_array, nan=0.0)
+        czt_array = np.nan_to_num(czt_array, nan=0.0)
+        yzhj_array = np.nan_to_num(yzhj_array, nan=0.0)
+        fzjz_array = np.nan_to_num(fzjz_array, nan=0.0)
 
-        risk = result['data'].astype(np.float32) * 0.7 + \
+        # 防灾能力区域内存在nan的情况
+        risk = np.nan_to_num(result['data'], nan=0.0).astype(np.float32) * 0.7 + \
                yzhj_array.astype(np.float32) * 0.1 + \
                czt_array.astype(np.float32) * 0.1 + \
                (1.0 - fzjz_array.astype(np.float32)) * 0.1
-
+        
+        print(f"综合风险指数数值范围: {np.nanmin(risk):.4f} ~ {np.nanmax(risk):.4f}")
+        
         risk_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险指数.tif")
         self._save_geotiff(risk, result['meta'], risk_tif_path, 0)  # 保存干旱综合风险指数
         result['data'] = risk

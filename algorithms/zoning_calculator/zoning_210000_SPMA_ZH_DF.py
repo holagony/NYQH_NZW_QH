@@ -146,7 +146,6 @@ class SPMA_ZH:
             values[sid] = float(np.nanmean([counts[y] for y in years])) if years else np.nan
 
         interp = self._interpolate(values, station_coords, cfg, algorithm_config)
-        nodata = interp['meta'].get('nodata', 0)
         grid = interp['data'].astype(np.float32)
         mask = ~np.isnan(grid)
         if np.any(mask):
@@ -161,7 +160,7 @@ class SPMA_ZH:
         norm[~mask] = np.nan
 
         norm_tif = os.path.join(cfg.get("resultPath"), "intermediate", "大风倒伏风险.tif")
-        self._save_geotiff_gdal(norm, interp['meta'], norm_tif, nodata)
+        self._save_geotiff_gdal(norm, interp['meta'], norm_tif, 0)
 
         class_conf = algorithm_config.get('classification', {})
         data_out = norm
@@ -173,7 +172,7 @@ class SPMA_ZH:
             except Exception:
                 data_out = norm
             class_tif = os.path.join(cfg.get("resultPath"), "大风倒伏风险_分级.tif")
-            self._save_geotiff_gdal(data_out.astype(np.int16), interp['meta'], class_tif, nodata)
+            self._save_geotiff_gdal(data_out.astype(np.int16), interp['meta'], class_tif, 0)
         meta = interp['meta']
 
         return {'data': data_out.astype(np.int16),
