@@ -1,18 +1,18 @@
 {
   "taskId": "123456",
-  "algoFrom": "zoning_150000_SPSO_ZH_SD",
-  "cropCode": "SPSO",
-  "zoningType": "ZH",
+  "algoFrom": "zoning_360000_CITR_BC_MS",
+  "cropCode": "CITR",
+  "zoningType": "BC",
   "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
-  "areaCode": "150000",
-  "areaName": "内蒙古自治区",
-  "element": "SD",
+  "areaCode": "360000",
+  "areaName": "江西",
+  "element": "MS",
   "startDate": "19910101",
   "endDate": "20201231",
   "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
-  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/150000_30grid.tif",
-  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/150000_dem.tif",
-  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/150000_wgs84.shp",
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/360000_30grid.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/360000_dem.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/360000_wgs84.shp",
   
   
   "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
@@ -34,9 +34,9 @@
   "growthPeriodPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/growth_period/150000_growth_period.xlsx",
   
   
-  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SPSO_ZH/resultLogFile.json",
-  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SPSO_ZH/resultJsonFile.json",
-  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SPSO_ZH/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SPSO_ZH/",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_CITR_BC/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_CITR_BC/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_CITR_BC/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_CITR_BC/",
   "algorithmConfig": {}
 }

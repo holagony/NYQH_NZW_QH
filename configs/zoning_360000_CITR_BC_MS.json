@@ -72,14 +72,14 @@
         }
     },        
     "classification": {
-        "method": "natural_breaks",
+        "method": "custom_thresholds",
         "num_classes": 4,
         "reverse_order": "False",
         "thresholds": [
-        {"min": "","max": 0.55, "level": 4, "label": "低风险"},    
-        {"min": 0.55, "max": 0.65, "level": 3, "label": "中风险"},  
-        {"min": 0.65, "max": 0.75, "level": 2, "label": "高风险"},  
-        {"min": 0.75, "max": "","level": 1, "label": "极高风险"}   
+        {"min": "","max": 0.175, "level": 4, "label": "低风险"},    
+        {"min": 0.175, "max": 0.22, "level": 3, "label": "中风险"},  
+        {"min": 0.22, "max": 0.28, "level": 2, "label": "高风险"},  
+        {"min": 0.28, "max": "","level": 1, "label": "极高风险"}   
         ]
     }
 }

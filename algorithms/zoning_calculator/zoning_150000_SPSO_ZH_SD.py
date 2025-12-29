@@ -440,9 +440,9 @@ class SPSO_ZH:
         method = str(interp_conf.get('method', 'idw')).lower()
         iparams = interp_conf.get('params', {})
         iparams["min_value"]=0
-        iparams["radius_dist"]=1.0
+        iparams["radius_dist"]=10
         iparams["min_num"]=5
-        iparams["first_size"]=50
+        iparams["first_size"]=100
 
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'
@@ -496,7 +496,7 @@ class SPSO_ZH:
         F_array = normalize_array(F_array)
 
         # FRI计算
-        FRI = interpolated_W_value * 0.593 + C_array * 0.255 + M_value * 0.106 + F_array * 0.046
+        FRI = interpolated_W_value * 0.593 + C_array * 0.255 + M_value * 0.106 - F_array * 0.046
         FRI=np.where(FRI<0,0,FRI)
 
         # 分级

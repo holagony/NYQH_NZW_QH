@@ -12,63 +12,49 @@ import os
 from osgeo import gdal
 import pandas as pd
 import numpy as np
+import time
 
-
-def calculate_seasonal_std(tavg_data: pd.Series) -> Tuple[float, Dict]:
+def calculate_seasonal_std(daily_data):
     """
     计算站点的季节变化标准差
-    
-    参数:
-    tavg_data: pandas Series，索引为日期，值为日平均气温
-    
-    返回:
-    tuple: (季节变化标准差, 包含详细结果的字典)
     """
+    # 从DataFrame中提取tavg列
+    tavg_series = daily_data["tavg"]
     
-    # 确保索引是datetime类型
-    if not isinstance(tavg_data.index, pd.DatetimeIndex):
-        try:
-            tavg_data.index = pd.to_datetime(tavg_data.index)
-        except:
-            raise ValueError("索引必须是日期格式或可转换为日期格式")
-    
-    # 创建数据副本并添加季节信息
-    df = pd.DataFrame({'tavg': tavg_data})
-    df['month'] = df.index.month
-    df['year'] = df.index.year
+    # 直接使用Series的索引获取月份和年份
+    months = tavg_series.index.month
+    years = tavg_series.index.year
     
     # 定义季节
     seasons = {
-        'spring': [3, 4, 5],   # 3-5月为春季
-        'summer': [6, 7, 8],   # 6-8月为夏季  
-        'autumn': [9, 10, 11], # 9-11月为秋季
-        'winter': [12, 1, 2]   # 12-2月为冬季
+        'spring': [3, 4, 5],
+        'summer': [6, 7, 8], 
+        'autumn': [9, 10, 11],
+        'winter': [12, 1, 2]
     }
     
-    # 计算每个季节的标准差
     seasonal_std = {}
     seasonal_data = {}
     
-    for season_name, months in seasons.items():
-        # 筛选该季节的数据
-        season_mask = df['month'].isin(months)
-        season_temps = df.loc[season_mask, 'tavg']
+    for season_name, season_months in seasons.items():
+        # 创建季节掩码
+        season_mask = np.isin(months, season_months)
+        season_temps = tavg_series[season_mask]
         
         # 计算标准差
         std_value = season_temps.std()
         seasonal_std[season_name] = std_value
         seasonal_data[season_name] = season_temps
     
-    # 计算季节变化标准差（四个季节标准差的平均值）
+    # 计算季节变化标准差
     seasonal_variation_std = np.mean(list(seasonal_std.values()))
     
-    # 整理详细结果
     detailed_results = {
         'seasonal_std': seasonal_std,
         'seasonal_data': seasonal_data,
-        'overall_std': tavg_data.std(),  # 全年总体标准差
-        'data_years': f"{df['year'].min()}-{df['year'].max()}",
-        'total_days': len(tavg_data)
+        'overall_std': tavg_series.std(),
+        'data_years': f"{years.min()}-{years.max()}",
+        'total_days': len(tavg_series)
     }
     
     return seasonal_variation_std, detailed_results
@@ -144,7 +130,7 @@ class CITR_BC:
         result = self._calculate_final_result(interp_results)
         
         # 5. 分级
-        class_result = self._classify_result(params, algorithm_config, result)
+        class_result = self._classify_result(params, algorithm_config, result,interp_results["D1"])
         
         return class_result
     
@@ -161,7 +147,7 @@ class CITR_BC:
             daily = dm.load_station_data(sid, cfg.get('startDate'), cfg.get('endDate'))
             season_std, _ = calculate_seasonal_std(daily)
             station_values[sid] = float(season_std) if np.isfinite(season_std) else np.nan
-        
+            
         return station_values
     
     def _extract_station_indicators(self, station_indicators):
@@ -170,13 +156,14 @@ class CITR_BC:
             'P1': {}, 'T1': {}, 'D1': {}, 'T2': {}, 'D2': {}
         }
         
-        for station_id, inds in station_indicators.items():
+        for station_id,inds in station_indicators.items():
+            #print(station_id,inds)
             indicators['P1'][station_id] = inds.get('P1', np.nan)
             indicators['T1'][station_id] = inds.get('T1', np.nan)
             indicators['D1'][station_id] = inds.get('D1', np.nan)
             indicators['T2'][station_id] = inds.get('T2', np.nan)
             indicators['D2'][station_id] = inds.get('D2', np.nan)
-        
+     
         return indicators
     
     def _interpolate_and_normalize_indicators(self, cfg, algorithm_config, station_coords, 
@@ -225,13 +212,14 @@ class CITR_BC:
                 result = KrigingInterpolation().execute(interp_data, config['iparams'])
             else:
                 result = LSMIDWInterpolation().execute(interp_data, config['iparams'])
-            
+            print(key+"插值完成")
             results[key] = {
                 'data': result['data'],
                 'norm': normalize_array(result['data']),
                 'meta': result['meta']
             }
-        
+            time.sleep(3)
+         
         return results
     
     def _save_intermediate_results(self, cfg, interp_results):
@@ -270,22 +258,27 @@ class CITR_BC:
         
         return result
     
-    def _classify_result(self, params, algorithm_config, result):
+    def _classify_result(self, params, algorithm_config, result,d1data):
         """对结果进行分级"""
         class_conf = algorithm_config.get('classification', {})
         key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
         classificator = params.get('algorithms', {})[key]
         
         classdata = classificator.execute(result, class_conf)
+        classdata2=classdata.copy()
+        classdata2=np.where(classdata==1,4,classdata2)
+        classdata2=np.where(classdata==2,3,classdata2)
+        classdata2=np.where(classdata==3,2,classdata2)
+        classdata2=np.where(classdata==4,1,classdata2)
         
         # 使用任意一个插值结果的元数据
-        meta_source = next(iter(params['station_indicators'].values()))
+        meta_source = d1data["meta"]
         
         return {
-            'data': classdata,
+            'data': classdata2,
             'meta': {
-                'width': classdata.shape[1],
-                'height': classdata.shape[0],
+                'width': classdata2.shape[1],
+                'height': classdata2.shape[0],
                 'transform': meta_source['transform'],
                 'crs': meta_source['crs']
             },

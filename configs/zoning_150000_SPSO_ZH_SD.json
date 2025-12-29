@@ -4,13 +4,13 @@
         "method": "lsm_idw"
     },
     "classification":{
-        "method": "custom_thresholds",
+        "method": "natural_breaks",
         "num_classes": 4,
         "thresholds": [
             {"min": "", "max": 0.15, "level": 4, "label": "低风险"},    
             {"min": 0.15, "max": 0.25, "level": 3, "label": "中风险"},  
-            {"min": 0.25, "max": 0.4, "level": 2, "label": "高风险"},  
-            {"min": 0.4, "max": "", "level": 1, "label": "极高风险"}   
+            {"min": 0.25, "max": 0.425, "level": 2, "label": "高风险"},  
+            {"min": 0.425, "max": "", "level": 1, "label": "极高风险"}   
            ]
     },
     "formula": { }   
