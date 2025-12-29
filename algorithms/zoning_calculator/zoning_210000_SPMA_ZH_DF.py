@@ -164,14 +164,14 @@ class SPMA_ZH:
         self._save_geotiff_gdal(norm, interp['meta'], norm_tif, nodata)
 
         class_conf = algorithm_config.get('classification', {})
-        data_out = interp['data']
+        data_out = norm
         if class_conf:
             method = class_conf.get('method', 'natural_breaks')
             try:
                 classifier = self._get_algorithm(f"classification.{method}")
-                data_out = classifier.execute(interp['data'].astype(float), class_conf)
+                data_out = classifier.execute(norm.astype(float), class_conf)
             except Exception:
-                data_out = interp['data']
+                data_out = norm
             class_tif = os.path.join(cfg.get("resultPath"), "大风倒伏风险_分级.tif")
             self._save_geotiff_gdal(data_out.astype(np.int16), interp['meta'], class_tif, nodata)
         meta = interp['meta']

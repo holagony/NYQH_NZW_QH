@@ -449,13 +449,30 @@ class SPMA_ZH:
         q_cls = classify_array(q_result['data'], num_classes)
         combined = (h_cls * q_cls).astype(np.int32)
 
+        # 归一化
+        combined_norm = normalize_array(np.where(combined == 0, np.nan, combined.astype(float)))
+        combined_norm = np.where(np.isnan(combined_norm), 0, combined_norm).astype(np.float32)
+
         # 中间结果输出
-        g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险指数.tif")
+        g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险.tif")
         meta = h_result['meta']
-        self._save_geotiff_gdal(combined, meta, g_tif_path, 0)
+        self._save_geotiff_gdal(combined_norm, meta, g_tif_path, 0)
+
+        # 分级
+        class_conf = algorithm_config.get('classification', {})
+        data_out = combined_norm
+        if class_conf:
+            method = class_conf.get('method', 'natural_breaks')
+            try:
+                classifier = self._get_algorithm(f"classification.{method}")
+                data_out = classifier.execute(combined_norm.astype(float), class_conf)
+            except Exception:
+                data_out = combined_norm 
+            class_tif = os.path.join(cfg.get("resultPath"), "干旱综合风险_分级.tif")
+            self._save_geotiff_gdal(data_out.astype(np.int16), meta, class_tif, 0)
 
         return {
-            'data': combined,
+            'data': data_out,
             'meta': {
                 'width': meta['width'],
                 'height': meta['height'],
