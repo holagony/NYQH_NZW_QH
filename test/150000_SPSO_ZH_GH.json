@@ -17,9 +17,9 @@
   "cztFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/内蒙古承载体脆弱性.tif",
   "yzhjFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/内蒙古孕灾环境敏感性.tif",
   "fzjzFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/内蒙古防灾减灾能力.tif",
-  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/150000_SPSO_ZH_GH/resultLogFile.json",
-  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/150000_SPSO_ZH_GH/resultJsonFile.json",
-  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/150000_SPSO_ZH_GH/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/150000_SPSO_ZH_GH",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/150000_SPSO_ZH_GH/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/150000_SPSO_ZH_GH/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/150000_SPSO_ZH_GH/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/150000_SPSO_ZH_GH",
   "algorithmConfig": {}
 }
