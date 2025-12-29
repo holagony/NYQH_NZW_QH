@@ -196,16 +196,32 @@ class SPSO_ZH:
         result_path: 对齐后的临时文件存储路径
         返回: 对齐后的numpy数组（NoData已置为NaN）
         '''
-        temp_path = os.path.join(result_path, 'intermediate', 'align_temp.tif')
+        base_dir = result_path if result_path else os.path.dirname(grid_path)
+        out_dir = os.path.join(base_dir, 'intermediate')
+        os.makedirs(out_dir, exist_ok=True)
+        temp_path = os.path.join(out_dir, 'align_temp.tif')
+        if (not target_path) or (not os.path.exists(target_path)):
+            gds = gdal.Open(grid_path)
+            rows, cols = gds.RasterYSize, gds.RasterXSize
+            gds = None
+            return np.zeros((rows, cols), dtype=np.float32)
         aligned_path = LSMIDWInterpolation()._align_datasets(grid_path, target_path, temp_path)
         ds = gdal.Open(aligned_path)
+        if ds is None:
+            gds = gdal.Open(grid_path)
+            rows, cols = gds.RasterYSize, gds.RasterXSize
+            gds = None
+            if os.path.exists(aligned_path):
+                os.remove(aligned_path)
+            return np.zeros((rows, cols), dtype=np.float32)
         band = ds.GetRasterBand(1)
         arr = band.ReadAsArray()
         nodata = band.GetNoDataValue()
-        # arr = np.where(arr == nodata, 0, arr) # 设置为0，而不是np.nan
-        arr = np.where(arr == nodata, np.nan, arr)
+        if nodata is not None:
+            arr = np.where(arr == nodata, np.nan, arr)
         ds = None
-        os.remove(aligned_path)
+        if os.path.exists(aligned_path):
+            os.remove(aligned_path)
         return arr
 
     def _calc_drought_station_g(self, data, config):
@@ -316,6 +332,9 @@ class SPSO_ZH:
         czt_array = self._align_and_read_input(grid_path, czt_path, cfg.get('resultPath'))
         yzhj_array = self._align_and_read_input(grid_path, yzhj_path, cfg.get('resultPath'))
         fzjz_array = self._align_and_read_input(grid_path, fzjz_path, cfg.get('resultPath'))
+        # czt_array = np.nan_to_num(czt_array, nan=0.0)
+        # yzhj_array = np.nan_to_num(yzhj_array, nan=0.0)
+        # fzjz_array = np.nan_to_num(fzjz_array, nan=0.0)
 
         risk = result['data'].astype(np.float32) * 0.7 + \
                yzhj_array.astype(np.float32) * 0.1 + \
