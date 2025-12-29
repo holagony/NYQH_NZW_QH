@@ -333,6 +333,8 @@ class SPSO_ZH:
             key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
             if key in algos:
                 result['data'] = algos[key].execute(result['data'], class_conf)
+                class_tif_path = os.path.join(cfg.get("resultPath"), "干旱综合风险指数_分级.tif")
+                self._save_geotiff(result['data'], result['meta'], class_tif_path, 0)
 
         return {
             'data': result['data'],
