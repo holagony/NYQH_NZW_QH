@@ -1,6 +1,6 @@
 {
   "taskId": "123456",
-  "algoFrom": "zoning_150000_SPSO_ZH",
+  "algoFrom": "zoning_150000_SPSO_ZH_GH",
   "cropCode": "SPSO",
   "zoningType": "ZH",
   "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",

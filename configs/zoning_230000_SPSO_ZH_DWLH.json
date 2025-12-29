@@ -1,0 +1,10 @@
+{
+    "indicators": {},
+    "interpolation": {
+        "method": "lsm_idw"
+    },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+    }
+}

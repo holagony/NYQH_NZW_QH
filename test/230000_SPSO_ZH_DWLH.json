@@ -1,6 +1,6 @@
 {
   "taskId": "123456",
-  "algoFrom": "zoning_230000_SPSO_ZH",
+  "algoFrom": "zoning_230000_SPSO_ZH_DWLH",
   "cropCode": "SPSO",
   "zoningType": "ZH",
   "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
@@ -14,10 +14,10 @@
   "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_230000.tif",
   "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/230000_wgs84.shp",
   "otherFilesPath": "",
-  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/230000_SPSO_ZH_DWLH/resultLogFile.json",
-  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/230000_SPSO_ZH_DWLH/resultJsonFile.json",
-  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/230000_SPSO_ZH_DWLH/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/230000_SPSO_ZH_DWLH",
-  "algorithmConfig": {},
-  "dependDir": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend"
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/230000_SPSO_ZH_DWLH/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/230000_SPSO_ZH_DWLH/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/230000_SPSO_ZH_DWLH/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/230000_SPSO_ZH_DWLH",
+  "dependDir": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
+  "algorithmConfig": {}
 }
