@@ -1,6 +1,6 @@
 {
   "taskId": "123456",
-  "algoFrom": "zoning_360000_CITR_ZH",
+  "algoFrom": "zoning_360000_CITR_ZH_YDDH",
   "cropCode": "CITR",
   "zoningType": "ZH",
   "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
@@ -14,10 +14,10 @@
   "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_360000.tif",
   "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/360000_wgs84.shp",
   "otherFilesPath": "",
-  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH/resultLogFile.json",
-  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH/resultJsonFile.json",
-  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/360000_CITR_ZH_YDDH",
-  "algorithmConfig": {},
-  "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend"
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/360000_CITR_ZH_YDDH/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/360000_CITR_ZH_YDDH/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/360000_CITR_ZH_YDDH/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/360000_CITR_ZH_YDDH",
+  "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
+  "algorithmConfig": {}
 }

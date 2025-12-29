@@ -87,35 +87,6 @@ def hazard_index(U_low, Y_low, U_mid, Y_mid, U_high, Y_high, method):
     return float(H)
 
 
-def normalize_values(values: List[float]) -> List[float]:
-    """
-    归一化数值到0-1范围
-    """
-    if not values:
-        return []
-
-    valid_values = [v for v in values if v is not None and not np.isnan(v)]
-    if not valid_values:
-        return [0.0] * len(values)
-
-    min_val = min(valid_values)
-    max_val = max(valid_values)
-
-    # 如果所有值都相同，归一化到0.5
-    if max_val == min_val:
-        return [0.5 if v is not None and not np.isnan(v) else 0.0 for v in values]
-
-    normalized = []
-    for v in values:
-        if v is None or np.isnan(v):
-            normalized.append(0.0)
-        else:
-            norm_val = (v - min_val) / (max_val - min_val)
-            normalized.append(norm_val)
-
-    return normalized
-
-
 def normalize_array(array: np.ndarray) -> np.ndarray:
     """
     归一化数组到0-1范围
@@ -146,9 +117,7 @@ def normalize_array(array: np.ndarray) -> np.ndarray:
 
 class CITR_ZH:
     '''
-    江西灾害区划
-    果实膨大期高温热害 GSPDQGWRH
-    越冬冻害（12月-次年2月） YDDH
+    江西灾害区划-越冬冻害（12月-次年2月） YDDH
     '''
 
     def _align_and_read_input(self, grid_path, target_path, result_path):
@@ -199,156 +168,6 @@ class CITR_ZH:
         band.SetNoDataValue(nodata)
         band.FlushCache()
         dataset = None
-
-    def _calc_GSPDQGWRH_station_H(self, data, config):
-        # 站点级：按年度滑窗统计轻/中/重事件次数，基于信息扩散计算危险性 H
-        tavg = data["tavg"] if "tavg" in data.columns else pd.Series(dtype=float)
-        tmax = data["tmax"] if "tmax" in data.columns else pd.Series(dtype=float)
-        if tavg.empty or tmax.empty:
-            return np.nan
-
-        start_date_str = config.get("start_date")
-        end_date_str = config.get("end_date")
-        year_offset = int(config.get("year_offset", 0))
-        years = sorted(data.index.year.unique())
-        if not years:
-            return np.nan
-
-        # 每年事件次数序列（轻/中/重），用于后续信息扩散
-        Y_low, Y_mid, Y_high = [], [], []
-        for y in years:
-            if start_date_str and end_date_str:
-                # 按配置定义年度窗口（支持跨年）
-                start_dt = pd.to_datetime(f"{y}-{start_date_str}")
-                end_dt = pd.to_datetime(f"{y + year_offset}-{end_date_str}")
-                mask = (data.index >= start_dt) & (data.index <= end_dt)
-                dfy = data.loc[mask]
-            else:
-                dfy = data[data.index.year == y]
-
-            if dfy.empty:
-                # 当年无数据：次数记 0
-                Y_low.append(0)
-                Y_mid.append(0)
-                Y_high.append(0)
-                continue
-
-            # 事件判据：日平均 ≥30 且 日最高 ≥36
-            cond = (dfy["tavg"] >= 30) & (dfy["tmax"] >= 36)
-
-            # 计算连续满足判据的段长度 d（滑窗/游程统计）
-            runs = []
-            c = 0  # 当前连续天数计数器
-            for v in cond.values:
-                if v:
-                    c += 1  # 满足条件则累加连续天数
-                else:
-                    if c > 0:
-                        runs.append(c)  # 一段连续区间结束，记录其长度
-                        c = 0  # 计数器归零，等待下一段
-            if c > 0:
-                runs.append(c)  # 序列以满足条件结束，补记最后一段
-
-            # 分级计数：轻 3–6天，中 7–9天，重 ≥10天
-            light = sum(1 for L in runs if 3 <= L <= 6)
-            medium = sum(1 for L in runs if 7 <= L <= 9)
-            heavy = sum(1 for L in runs if L >= 10)
-            Y_low.append(light)
-            Y_mid.append(medium)
-            Y_high.append(heavy)
-
-        # 论域（年度次数）按 0..max(Y) 构建，至少包含 0
-        U_low = list(range(0, (max(Y_low) if Y_low else 0) + 1)) or [0]
-        U_mid = list(range(0, (max(Y_mid) if Y_mid else 0) + 1)) or [0]
-        U_high = list(range(0, (max(Y_high) if Y_high else 0) + 1)) or [0]
-
-        # 信息扩散 + 加权归约，得到站点危险性指数 H
-        H = hazard_index(U_low, Y_low, U_mid, Y_mid, U_high, Y_high, method='mean')
-
-        return float(H)
-
-    def calculate_GSPDQGWRH(self, params):
-        station_coords = params.get('station_coords', {})
-        algorithm_config = params.get('algorithmConfig', {})
-        hazard_config = algorithm_config.get('hazard', {})
-        cfg = params.get('config', {})
-        data_dir = cfg.get('inputFilePath')
-        station_file = cfg.get('stationFilePath')
-
-        # 加载数据管理器
-        dm = DataManager(data_dir, station_file, multiprocess=False, num_processes=1)
-        station_ids = list(station_coords.keys())
-        if not station_ids:
-            station_ids = dm.get_all_stations()
-        available = set(dm.get_all_stations())
-
-        station_ids = [sid for sid in station_ids if sid in available]
-        start_date = cfg.get('startDate')
-        end_date = cfg.get('endDate')
-        station_values = {}
-
-        # 逐站点获取数据 + 计算危险性H
-        for sid in station_ids:
-            daily = dm.load_station_data(sid, start_date, end_date)
-            H = self._calc_GSPDQGWRH_station_H(daily, hazard_config)
-            station_values[sid] = float(H) if np.isfinite(H) else np.nan
-
-        # 输出插值前站点数值范围
-        vals = [v for v in station_values.values() if not np.isnan(v)]
-        if vals:
-            data_min = float(np.min(vals))
-            data_max = float(np.max(vals))
-            print(f"插值前站点数值范围: {data_min:.4f} ~ {data_max:.4f}")
-
-        # 危险性H插值
-        interp_conf = algorithm_config.get('interpolation')
-        method = str(interp_conf.get('method', 'idw')).lower()
-        iparams = interp_conf.get('params', {})
-
-        if 'var_name' not in iparams:
-            iparams['var_name'] = 'value'
-
-        interp_data = {'station_values': station_values, 'station_coords': station_coords, 'grid_path': cfg.get('gridFilePath'), 'dem_path': cfg.get('demFilePath'), 'area_code': cfg.get('areaCode'), 'shp_path': cfg.get('shpFilePath')}
-
-        if method == 'lsm_idw':  # 生成tif
-            result = LSMIDWInterpolation().execute(interp_data, iparams)
-        else:
-            result = IDWInterpolation().execute(interp_data, iparams)
-
-        # 数值设置 + tiff保存
-        # result['data'] = np.maximum(result['data'], 0)
-        # result['data'] = np.where(np.isnan(result['data']), 0, result['data'])  # 将NaN也设为0
-        result['data'] = normalize_array(result['data'])  # 归一化
-        H_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "高温热害危险性指数.tif")
-        self._save_geotiff(result['data'], result['meta'], H_tif_path, 0)
-
-        # 读取其他静态数据，结合危险性H，计算区划风险
-        # czt_path = cfg.get('cztFilePath')
-        # yzhj_path = cfg.get('yzhjFilePath')
-        # fzjz_path = cfg.get('fzjzFilePath')
-        # grid_path = interp_data['grid_path']
-        # czt_array = self._align_and_read_input(grid_path, czt_path, cfg.get('resultPath'))
-        # yzhj_array = self._align_and_read_input(grid_path, yzhj_path, cfg.get('resultPath'))
-        # fzjz_array = self._align_and_read_input(grid_path, fzjz_path, cfg.get('resultPath'))
-
-        # risk = result['data'].astype(np.float32) * 0.7 + \
-        #        yzhj_array.astype(np.float32) * 0.1 + \
-        #        czt_array.astype(np.float32) * 0.1 + \
-        #        (1.0 - fzjz_array.astype(np.float32)) * 0.1
-
-        # risk_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险指数.tif")
-        # self._save_geotiff(risk, result['meta'], risk_tif_path, 0)  # 保存干旱综合风险指数
-        # result['data'] = risk
-
-        # 分级
-        class_conf = algorithm_config.get('classification', {})
-        if class_conf:
-            algos = params.get('algorithms', {})
-            key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
-            if key in algos:
-                result['data'] = algos[key].execute(result['data'], class_conf)
-
-        return {'data': result['data'], 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}}
 
     def _calc_YDDH_station_H(self, data, config):
         tmin = data["tmin"] if "tmin" in data.columns else pd.Series(dtype=float)
@@ -449,7 +268,7 @@ class CITR_ZH:
         # result['data'] = np.maximum(result['data'], 0)
         # result['data'] = np.where(np.isnan(result['data']), 0, result['data'])  # 将NaN也设为0
         result['data'] = normalize_array(result['data'])  # 归一化
-        H_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "低温冷害危险性指数.tif")
+        H_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "低温冷害危险性_归一化.tif")
         self._save_geotiff(result['data'], result['meta'], H_tif_path, 0)
 
         # 读取其他静态数据，结合危险性H，计算区划风险
@@ -477,6 +296,8 @@ class CITR_ZH:
             key = f"classification.{class_conf.get('method', 'custom_thresholds')}"
             if key in algos:
                 result['data'] = algos[key].execute(result['data'], class_conf)
+                class_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "低温冷害危险性_分级.tif")
+                self._save_geotiff(result['data'], result['meta'], class_tif_path, 0)
 
         return {'data': result['data'], 'meta': {'width': result['meta']['width'], 'height': result['meta']['height'], 'transform': result['meta']['transform'], 'crs': result['meta']['crs']}}
 
