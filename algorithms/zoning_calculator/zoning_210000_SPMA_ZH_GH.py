@@ -352,8 +352,8 @@ class SPMA_ZH:
         sev_val = {"轻旱": 1.0, "中旱": 2.0, "重旱": 3.0, "特旱": 4.0}      # 等级记分 Di,j
         years = sorted(series.index.year.unique())
 
-        # Hcwdi计算：按式（5-9），Pi,j 固定采用式（5-4）的“年均日数”口径
-        h_years = []
+        # Hcwdi计算：按式（5-9），Pi,j 采用“年平均频率”（逐年频率求均值）
+        freq_years = {st: {k: [] for k in sev_val.keys()} for st in stage_order}
         for y in years:
             counts = {st: {k: 0 for k in sev_val.keys()} for st in stage_order}  # 各阶段各级别次数，{'出苗-拔节': {'轻旱': 0, '中旱': 0, '重旱': 0, '特旱': 0}, ...}
             stage_days = {st: 0 for st in stage_order} # 各阶段累计天数，用于频率分母
@@ -371,16 +371,21 @@ class SPMA_ZH:
                 counts[st]["中旱"] += int(((seg > b[1]) & (seg <= b[2])).sum())
                 counts[st]["重旱"] += int(((seg > b[2]) & (seg <= b[3])).sum())
                 counts[st]["特旱"] += int((seg > b[3]).sum())
-            
-            # 计算该年的Hcwdi
-            h_sum = 0.0
-            for i, st in enumerate(stage_order): # 针对每个生育期
-                days = max(stage_days[st], 1)
-                d_p = sum(sev_val[k] * (counts[st][k] / days) for k in sev_val.keys())
-                h_sum += stage_weights[i] * d_p
-            h_years.append(h_sum)
 
-        Hcwdi = float(np.mean(h_years))
+            # 记录逐年频率（仅记录有数据的年份）
+            for st in stage_order:
+                days = stage_days[st]
+                if days > 0:
+                    for k in sev_val.keys():
+                        freq_years[st][k].append(counts[st][k] / days)
+
+        # 直接以年平均频率计算 Hcwdi（不再先算每年H再取平均）
+        Hcwdi_sum = 0.0
+        for i, st in enumerate(stage_order):
+            d_p = sum(sev_val[k] * (np.mean(freq_years[st][k]) if len(freq_years[st][k]) > 0 else 0.0)
+                      for k in sev_val.keys())
+            Hcwdi_sum += stage_weights[i] * d_p
+        Hcwdi = float(Hcwdi_sum)
 
         # Qcwdi计算
         etc_total = 0.0
@@ -450,24 +455,24 @@ class SPMA_ZH:
         combined = (h_cls * q_cls).astype(np.int32)
 
         # 归一化
-        combined_norm = normalize_array(np.where(combined == 0, np.nan, combined.astype(float)))
-        combined_norm = np.where(np.isnan(combined_norm), 0, combined_norm).astype(np.float32)
+        # combined_norm = normalize_array(np.where(combined == 0, np.nan, combined.astype(float)))
+        # combined_norm = np.where(np.isnan(combined_norm), 0, combined_norm).astype(np.float32)
 
         # 中间结果输出
         g_tif_path = os.path.join(cfg.get("resultPath"), "intermediate", "干旱综合风险.tif")
         meta = h_result['meta']
-        self._save_geotiff_gdal(combined_norm, meta, g_tif_path, 0)
+        self._save_geotiff_gdal(combined, meta, g_tif_path, 0)
 
         # 分级
         class_conf = algorithm_config.get('classification', {})
-        data_out = combined_norm
+        data_out = combined
         if class_conf:
             method = class_conf.get('method', 'natural_breaks')
             try:
                 classifier = self._get_algorithm(f"classification.{method}")
-                data_out = classifier.execute(combined_norm.astype(float), class_conf)
+                data_out = classifier.execute(combined.astype(float), class_conf)
             except Exception:
-                data_out = combined_norm 
+                data_out = combined
             class_tif = os.path.join(cfg.get("resultPath"), "干旱综合风险_分级.tif")
             self._save_geotiff_gdal(data_out.astype(np.int16), meta, class_tif, 0)
 

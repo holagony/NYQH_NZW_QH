@@ -327,32 +327,27 @@ class SPSO_ZH:
             result = IDWInterpolation().execute(interp_data, iparams)
 
         # 归一化栅格并保存中间结果tif
-        result['data'] = normalize_array(result['data'])
+        result_norm = normalize_array(result['data'])
         g_tif_path = os.path.join(config.get("resultPath"), "intermediate", "低温冷害危险性指数_归一化.tif")
-        self._save_geotiff_gdal(result['data'], result['meta'], g_tif_path, 0)
+        self._save_geotiff_gdal(result_norm, result['meta'], g_tif_path, 0)
 
         # 增加分级
         class_conf = algorithmConfig.get('classification', {})
-        data_out = result['data']
         if class_conf:
             method = class_conf.get('method', 'natural_breaks')
-            try:
-                classifier = self._get_algorithm(f"classification.{method}")
-                data_out = classifier.execute(data_out.astype(float), class_conf)
-            except Exception:
-                data_out = result['data']
+            classifier = self._get_algorithm(f"classification.{method}")
+            data_out = classifier.execute(result['data'], class_conf)
             class_tif = os.path.join(config.get("resultPath"), "低温冷害危险性指数_分级.tif")
             self._save_geotiff_gdal(data_out.astype(np.int16), result['meta'], class_tif, 0)
-
+        
         return {
-            'data': result['data'],
+            'data': data_out,
             'meta': {
                 'width': result['meta']['width'],
                 'height': result['meta']['height'],
                 'transform': result['meta']['transform'],
                 'crs': result['meta']['crs']
-            },
-            'type': '黑龙江低温冷害'
+            }
         }
 
     def calculate(self, params):
