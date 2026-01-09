@@ -1,0 +1,15 @@
+{
+  "indicators": {},
+  "months": [6, 7, 8],
+  "dry_threshold_mm": 0.1,
+  "k": 2.83,
+  "tmax_weight": 0.4,
+  "dr_weight": 0.6,
+  "interpolation": {
+    "method": "lsm_idw"
+  },
+  "classification": {
+    "method": "natural_breaks",
+    "num_classes": 3
+  }
+}
