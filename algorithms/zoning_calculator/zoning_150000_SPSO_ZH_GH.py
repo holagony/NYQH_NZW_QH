@@ -300,6 +300,8 @@ class SPSO_ZH:
         interp_conf = algorithm_config.get('interpolation')
         method = str(interp_conf.get('method', 'lsm_idw')).lower()
         iparams = interp_conf.get('params', {})
+        iparams["radius_dist"]=10
+        iparams["first_size"]=100
 
         if 'var_name' not in iparams:
             iparams['var_name'] = 'value'

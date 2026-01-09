@@ -1,0 +1,33 @@
+{
+  "indicators": {
+    "RAIN_DAYS": {
+      "type": "conditional_count",
+      "frequency": "yearly",
+      "start_date": "09-01",
+      "end_date": "10-10",
+      "conditions": [
+        { "variable": "precip", "operator": ">", "value": 0.1 }
+      ],
+      "description": "9月上旬—10月上旬雨日数（precip>0.1mm）"
+    },
+    "PRECIP_SUM": {
+      "type": "period_sum",
+      "frequency": "yearly",
+      "variable": "precip",
+      "start_date": "09-01",
+      "end_date": "10-10",
+      "description": "9月上旬—10月上旬总降水量（毫米）"
+    }
+  },
+  "weights": {
+    "RAIN_DAYS": 0.7,
+    "PRECIP_SUM": 0.3
+  },
+  "interpolation": {
+    "method": "idw"
+  },
+  "classification": {
+    "method": "natural_breaks",
+    "num_classes": 4
+  }
+}

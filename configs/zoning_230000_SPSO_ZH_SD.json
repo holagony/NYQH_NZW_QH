@@ -1,0 +1,18 @@
+{
+    "indicators": {},
+    "interpolation": {
+        "method": "lsm_idw"
+    },
+    "classification":{
+        "method": "custom_thresholds",
+        "num_classes": 4,
+        "thresholds": [
+            {"min": "", "max": 0.38, "level": 4, "label": "低风险"},    
+            {"min": 0.38, "max": 0.52, "level": 3, "label": "中风险"},  
+            {"min": 0.52, "max": 0.62, "level": 2, "label": "高风险"},  
+            {"min": 0.62, "max": "", "level": 1, "label": "极高风险"}   
+           ]
+    },
+    "formula": { }   
+    
+}

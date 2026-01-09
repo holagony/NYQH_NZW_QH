@@ -1,0 +1,23 @@
+{
+  "taskId": "123456",
+  "algoFrom": "zoning_230000_SPSO_ZH_ZL",
+  "cropCode": "SPSO",
+  "zoningType": "ZH",
+  "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
+  "areaCode": "230000",
+  "areaName": "黑龙江省",
+  "element": "ZL",
+  "startDate": "19910101",
+  "endDate": "20201231",
+  "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
+  "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/230000_30grid_wgs84.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_230000.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/230000_wgs84.shp",
+  "otherFilesPath": "",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/ZH_ZL_230000/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/ZH_ZL_230000/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/ZH_ZL_230000/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/ZH_ZL_230000",
+  "algorithmConfig": {}
+}

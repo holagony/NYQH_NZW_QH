@@ -1,0 +1,58 @@
+{
+  "indicators": {
+    "YDDH_light": {
+      "type": "conditional_count",
+      "frequency": "yearly",
+      "start_date": "12-01",
+      "end_date": "02-28",
+      "conditions": [
+        { "variable": "tmin", "operator": ">", "value": -24 },
+        { "variable": "tmin", "operator": "<=", "value": -20 }
+      ],
+      "description": "轻度越冬冻害日数（-24<Tmin≤-20℃）"
+    },
+    "YDDH_medium": {
+      "type": "conditional_count",
+      "frequency": "yearly",
+      "start_date": "12-01",
+      "end_date": "02-28",
+      "conditions": [
+        { "variable": "tmin", "operator": ">", "value": -28 },
+        { "variable": "tmin", "operator": "<=", "value": -24 }
+      ],
+      "description": "中度越冬冻害日数（-28<Tmin≤-24℃）"
+    },
+    "YDDH_heavy": {
+      "type": "conditional_count",
+      "frequency": "yearly",
+      "start_date": "12-01",
+      "end_date": "02-28",
+      "conditions": [
+        { "variable": "tmin", "operator": "<=", "value": -28 }
+      ],
+      "description": "重度越冬冻害日数（Tmin≤-28℃）"
+    }
+  },
+  "weights": {
+    "YDDH_light": 0.3,
+    "YDDH_medium": 0.5,
+    "YDDH_heavy": 0.7
+  },
+  "interpolation": {
+    "method": "lsm_idw"
+  },
+  "classification": {
+    "method": "natural_breaks",
+    "num_classes": 4
+  },
+  "threshold_des": [
+    { "name_id": "level", "name": "序号" },
+    { "name_id": "label", "name": "等级" },
+    { "name_id": "tmin", "name": "日最低气温阈值(°C)" }
+  ],
+  "threshold_usage": "等级由日最低气温阈值组合定义：轻（-24<Tmin≤-20）、中（-28<Tmin≤-24）、重（Tmin≤-28）。按年度统计各等级日数，信息扩散法估计“为0”的概率p0，取occ=1-p0后按权重加权得到危险性指数。",
+  "formula": {
+    "formula": "H = 0.3*occ_light + 0.5*occ_medium + 0.7*occ_heavy",
+    "description": "occ为对应等级年度日数互补概率（occ=1-p0），p0为该等级年度满足次数为0的概率。"
+  }
+}

@@ -305,7 +305,40 @@ class SPSO_ZH:
     内蒙古-大豆-灾害区划
     干旱和霜冻
     '''
-
+    def _align_and_read_input(self, grid_path, target_path, result_path):
+        '''
+        将单个外部栅格对齐到grid_path，并读取为数组
+        target_path: 要对齐的目标栅格路径
+        result_path: 对齐后的临时文件存储路径
+        返回: 对齐后的numpy数组（NoData已置为NaN）
+        '''
+        base_dir = result_path if result_path else os.path.dirname(grid_path)
+        out_dir = os.path.join(base_dir, 'intermediate')
+        os.makedirs(out_dir, exist_ok=True)
+        temp_path = os.path.join(out_dir, 'align_temp.tif')
+        if (not target_path) or (not os.path.exists(target_path)):
+            gds = gdal.Open(grid_path)
+            rows, cols = gds.RasterYSize, gds.RasterXSize
+            gds = None
+            return np.zeros((rows, cols), dtype=np.float32)
+        aligned_path = LSMIDWInterpolation()._align_datasets(grid_path, target_path, temp_path)
+        ds = gdal.Open(aligned_path)
+        if ds is None:
+            gds = gdal.Open(grid_path)
+            rows, cols = gds.RasterYSize, gds.RasterXSize
+            gds = None
+            if os.path.exists(aligned_path):
+                os.remove(aligned_path)
+            return np.zeros((rows, cols), dtype=np.float32)
+        band = ds.GetRasterBand(1)
+        arr = band.ReadAsArray()
+        nodata = band.GetNoDataValue()
+        if nodata is not None:
+            arr = np.where(arr == nodata, np.nan, arr)
+        ds = None
+        if os.path.exists(aligned_path):
+            os.remove(aligned_path)
+        return arr
     def _calculate_frost(self, params):
         """霜冻灾害风险指数模型"""
         station_coords = params.get('station_coords', {})
@@ -477,24 +510,16 @@ class SPSO_ZH:
 
         # 霜冻承灾体暴露度指数C，承载体脆弱性指标(大豆种植面积比例栅格数据)
         ZZ_percent_path = interp_data["CZT_CRX"]
-        ZZ_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/ZZ_temp.tif"
-        ZZ_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], ZZ_percent_path, ZZ_temp_path)
-        in_ds_C = gdal.Open(ZZ_temp_path)
-        C_array = in_ds_C.GetRasterBand(1).ReadAsArray()  # 读取波段数据
-        Nodata = in_ds_C.GetRasterBand(1).GetNoDataValue()
-        C_array = np.where(C_array == Nodata, 0, C_array)
+        C_array=self._align_and_read_input(interp_data["grid_path"], ZZ_percent_path, cfg.get('resultPath'))
+        C_array = np.nan_to_num(C_array, nan=0.0)
         C_array = normalize_array(C_array)
 
         # 霜冻防灾减灾能力指数F(灌溉面积百分比)
         GG_percent_path = interp_data["FZJZNL"]
-        GG_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/GG_temp.tif"
-        GG_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], GG_percent_path, GG_temp_path)
-        in_ds_F = gdal.Open(GG_temp_path)
-        F_array = in_ds_F.GetRasterBand(1).ReadAsArray()  # 读取波段数据
-        Nodata = in_ds_F.GetRasterBand(1).GetNoDataValue()
-        F_array = np.where(F_array == Nodata, 0, F_array)
+        F_array=self._align_and_read_input(interp_data["grid_path"], GG_percent_path, cfg.get('resultPath'))
+        F_array = np.nan_to_num(F_array, nan=0.0)
         F_array = normalize_array(F_array)
-
+        
         # FRI计算
         FRI = interpolated_W_value * 0.593 + C_array * 0.255 + M_value * 0.106 - F_array * 0.046
         FRI=np.where(FRI<0,0,FRI)
@@ -505,8 +530,7 @@ class SPSO_ZH:
         classificator = params.get('algorithms', {})[key]
         # 执行
         classdata = classificator.execute(FRI, class_conf)
-        os.remove(ZZ_temp_path)
-        os.remove(GG_temp_path)
+
         return {
             'data': classdata,
             'meta': {

@@ -1,0 +1,118 @@
+{
+    "indicators": {
+        "GRF_light": {
+            "type": "conditional_count",
+            "frequency": "yearly",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "conditions": [
+                {
+                    "variable": "tmax",
+                    "operator": ">=",
+                    "value": 32
+                },
+                {
+                    "variable": "tmax",
+                    "operator": "<",
+                    "value": 34
+                },
+                {
+                    "variable": "rhum",
+                    "operator": "<=",
+                    "value": 30
+                },
+                {
+                    "variable": "wind",
+                    "operator": ">=",
+                    "value": 3
+                }
+            ],
+            "description": "轻度干热风日数"
+        },
+        "GRF_moderate": {
+            "type": "conditional_count",
+            "frequency": "yearly",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "conditions": [
+                {
+                    "variable": "tmax",
+                    "operator": ">=",
+                    "value": 34
+                },
+                {
+                    "variable": "tmax",
+                    "operator": "<",
+                    "value": 35
+                },
+                {
+                    "variable": "rhum",
+                    "operator": "<=",
+                    "value": 25
+                },
+                {
+                    "variable": "wind",
+                    "operator": ">=",
+                    "value": 3
+                }
+            ],
+            "description": "中度干热风日数"
+        },
+        "GRF_severe": {
+            "type": "conditional_count",
+            "frequency": "yearly",
+            "start_date": "05-01",
+            "end_date": "06-10",
+            "conditions": [
+                {
+                    "variable": "tmax",
+                    "operator": ">=",
+                    "value": 35
+                },
+                {
+                    "variable": "rhum",
+                    "operator": "<=",
+                    "value": 25
+                },
+                {
+                    "variable": "wind",
+                    "operator": ">=",
+                    "value": 3
+                }
+            ],
+            "description": "重度干热风日数"
+        }
+    },
+  "interpolation": {
+    "method": "idw",
+    "params": {
+      "block_size": 256,
+      "radius_dist": 5.0,
+      "min_num": 10,
+      "first_size": 100,
+      "nodata": 0
+    }
+  },
+  "classification": {
+    "method": "custom_thresholds",
+    "thresholds": [
+      { "min": "", "max": 1, "level": 4, "label": "低风险" },
+      { "min": 1, "max": 3, "level": 3, "label": "中风险" },
+      { "min": 3, "max": 6, "level": 2, "label": "高风险" },
+      { "min": 6, "max": "", "level": 1, "label": "极高风险" }
+    ]
+  },
+  "threshold_des": [
+    { "name_id": "level", "name": "序号" },
+    { "name_id": "label", "name": "等级" },
+    { "name_id": "tmax", "name": "最高温度阈值(°C)" },
+    { "name_id": "rhum", "name": "最低相对湿度阈值(%)" },
+    { "name_id": "wind", "name": "风速阈值(m/s)" },
+    { "name_id": "weight", "name": "权重" }
+  ],
+  "threshold_usage": "各等级阈值通过 tmax/rhum/wind 组合定义：tmax 采用相邻等级的上下界分段（当前等级的 tmax ≤ 当日 Tmax < 下一等级的 tmax）；rhum 表示当日最小相对湿度 ≤ 阈值；wind 表示当日风速 ≥ 阈值。各等级权重相加为 1。",
+  "formula": {
+    "formula": "H = w1*occ_l + w2*occ_m + w3*occ_s",
+    "description": "w 为权重系数；occ_l/occ_m/occ_s 分别表示满足轻/中/重等级条件的发生日数。"
+  }
+  }

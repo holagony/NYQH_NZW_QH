@@ -1,0 +1,48 @@
+{
+  "indicators": {},
+  "weights": {
+    "YDDH_light": 0.3,
+    "YDDH_medium": 0.5,
+    "YDDH_heavy": 0.7
+  },
+  "interpolation": {
+    "method": "lsm_idw"
+  },
+  "classification": {
+    "method": "natural_breaks",
+    "num_classes": 3
+  },
+  "threshold_des": [
+    { "name_id": "level", "name": "序号" },
+    { "name_id": "label", "name": "等级" },
+    { "name_id": "tmin", "name": "日最低气温阈值(°C)" }
+  ],
+  "threshold_usage": "等级由日最低气温阈值组合定义：轻（-24<Tmin≤-20）、中（-28<Tmin≤-24）、重（Tmin≤-28）。按年度统计各等级日数，信息扩散法估计“为0”的概率p0，取occ=1-p0后按权重加权得到危险性指数。",
+  "formula": {
+    "formula": "H = 0.3*occ_light + 0.5*occ_medium + 0.7*occ_heavy",
+    "description": "occ为对应等级年度日数频率/日数。"
+  },
+  "station_time_windows": [
+    {
+      "start_date": "03-26",
+      "end_date": "04-15",
+      "stations": ["53725","53738","53832","53735","53749","53646","53651","53567"]
+    },
+    {
+      "start_date": "04-06",
+      "end_date": "04-25",
+      "stations": ["53848","53841","53748","53751","53750","53658"]
+    },
+    {
+      "start_date": "04-16",
+      "end_date": "05-05",
+      "stations": ["53756","53754","53850","53757","53854","53845","53857","53946","53942","53931","53944","53945","53938","57023","53929","57022","57021","57003"]
+    },
+    {
+      "start_date": "04-21",
+      "end_date": "05-10",
+      "stations": ["57113","57016","57020","57025","57024","57026","57030","57035","57029","57031","57037","53947","57042","53948","53941","53949","539509","53955"]
+    }
+  ],
+  "default_time_window": ["04-16","05-05"]
+}
