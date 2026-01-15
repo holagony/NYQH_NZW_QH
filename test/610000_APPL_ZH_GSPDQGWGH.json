@@ -14,10 +14,10 @@
   "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/china_dem_610000.tif",
   "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/610000_wgs84.shp",
   "otherFilesPath": "",
-  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/610000_APPL_ZH_GSPDQGWGH/resultLogFile.json",
-  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/610000_APPL_ZH_GSPDQGWGH/resultJsonFile.json",
-  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/610000_APPL_ZH_GSPDQGWGH/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/test/610000_APPL_ZH_GSPDQGWGH",
+  "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/610000_APPL_ZH_GSPDQGWGH/resultLogFile.json",
+  "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/610000_APPL_ZH_GSPDQGWGH/resultJsonFile.json",
+  "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/610000_APPL_ZH_GSPDQGWGH/resultFlowFile.json",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/610000_APPL_ZH_GSPDQGWGH",
   "dependDir": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
   "algorithmConfig": {}
 }
