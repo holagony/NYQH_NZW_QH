@@ -1,0 +1,13 @@
+{
+  "indicators": {},
+  "crop_name": "冬小麦",
+  "frost_stage_start": "拔节",
+  "frost_stage_end": "成熟",
+  "interpolation": {
+    "method": "lsm_idw"
+  },
+  "classification": {
+    "method": "natural_breaks",
+    "num_classes": 4
+  }
+}
