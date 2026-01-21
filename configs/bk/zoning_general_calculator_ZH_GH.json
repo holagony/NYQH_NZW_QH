@@ -1,0 +1,28 @@
+{
+  "start_date": "05-01",
+  "end_date": "08-31",
+  "year_offset": 0,
+  "indicators": {},
+  "threshold": [
+    {"min": 35, "max": 45, "level": 1, "label": "轻旱", "weight": 0.15},
+    {"min": 45, "max": 55, "level": 2, "label": "中旱", "weight": 0.35},
+    {"min": 55, "max": "", "level": 3, "label": "重旱", "weight": 0.5}
+  ],
+  "interpolation": { "method": "idw" },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+    },
+  "threshold_des": [
+    { "name_id": "level", "name": "序号" },
+    { "name_id": "label", "name": "干旱等级" },
+    { "name_id": "min", "name": "CWDI最小值(%)" },
+    { "name_id": "max", "name": "CWDI最大值(%)" },
+    { "name_id": "weight", "name": "权重" }
+  ],
+  "threshold_usage": "对于不同干旱等级：最小值 ≤ CWDI值 < 最大值。各等级权重相加为1。",
+  "formula": {
+    "formula": "Drought_HazardRisk = w1*D1 + w2*D2 + w3*D3",
+    "description": "w1/w2/w3 为各干旱等级权重；D1/D2/D3 分别是轻旱、中旱、重旱发生频率。"
+  }
+}

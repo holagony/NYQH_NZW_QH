@@ -1,0 +1,41 @@
+{
+    "start_date": "01-01",
+    "end_date": "12-31",
+    "tavg_threshold": 30,
+    "tmax_threshold": 36,
+    "indicators": {},
+    "threshold": [
+        {
+            "min": 3,
+            "max": 6,
+            "level": 1,
+            "label": "轻",
+            "weight": 0.2
+        },
+        {
+            "min": 6,
+            "max": 9,
+            "level": 2,
+            "label": "中",
+            "weight": 0.3
+        },
+        {
+            "min": 9,
+            "max": "",
+            "level": 3,
+            "label": "重",
+            "weight": 0.5
+        }
+    ],
+    "formula": {
+        "formula": "H=w1*occ_l+w2*occ_m+w3*occ_s",
+        "description": "w为各项权重，occ代表事件不出现的概率occ=1-p0,p0为不同程度高温热害连续时段出现的概率。"
+    },
+    "interpolation": {
+        "method": "lsm_idw"
+    },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+    }
+}

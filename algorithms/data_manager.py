@@ -559,10 +559,10 @@ class DataManager:
         matched_stations = []
         for station_id, info in self._station_info_cache.items():
             # 使用PAC_prov进行匹配
-            if info.get('PAC_prov', '') == province_code:
+            if (province_code == "000000") | (info.get('PAC_prov', '') == province_code):
                 matched_stations.append(station_id)
         
-        print(f"找到 {len(matched_stations)} 个属于省份代码 {province_code} 的站点")
+        # print(f"找到 {len(matched_stations)} 个属于省份代码 {province_code} 的站点")
         return matched_stations
     
     def get_station_info(self, station_id: str) -> Dict[str, Any]:

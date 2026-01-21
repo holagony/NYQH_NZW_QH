@@ -140,6 +140,7 @@ class ZoningProcessor:
                 
                 # 尝试读取逐日数据文件
                 daily_output_path = Path(self.intermediate_output).with_name(f"daily_{Path(self.intermediate_output).name}")
+                # self.daily_data_path = daily_output_path
                 if daily_output_path.exists():
                     try:
                         daily_indicators_df = pd.read_csv(daily_output_path, encoding='gbk')
@@ -310,9 +311,9 @@ class ZoningProcessor:
         if self.algo_from:
             if "zoning_general_calculator" in self.algo_from:
                 calculator_name = self.algo_from
-                class_name = self.algo_from.replace("zoning_general_calculator_", "", 1)
-                if not class_name or class_name == "zoning_general_calculator":
-                    class_name = "GenericZoningCalculator"
+                # class_name = self.algo_from.replace("zoning_general_calculator_", "", 1)
+                # if not class_name or class_name == "zoning_general_calculator":
+                class_name = "GenericZoningCalculator"
                 self.fjson.log(f"使用配置算法: {calculator_name}")
             else:
                 calculator_name = self.algo_from
@@ -343,6 +344,7 @@ class ZoningProcessor:
                 calc_params = {
                     'station_indicators': station_indicators,
                     'station_coords': station_coords,
+                    # 'daily_data_path':self.daily_data_path,
                     'algorithmConfig': self.algorithm_config,
                     'algorithms': self._algorithms,
                     'config': self.config,
@@ -413,43 +415,7 @@ class ZoningProcessor:
         except Exception as e:
             self.fjson.log(f"通用计算器也失败: {str(e)}")
             raise
-
-
-    # def _save_results(self, zoning_result: Dict[str, Any]):
-    #     """保存结果 - 使用GDAL直接裁剪市县级数据"""
-    #     # 生成输出文件名
-    #     tif_filename = self._generate_output_filename("tif")
-    #     tif_path = os.path.join(self.result_path, tif_filename)
-        
-    #     # 保存TIFF文件
-    #     self._save_geotiff(zoning_result['data'], zoning_result['meta'], tif_path, 0)
-        
-    #     from algorithms.common_tool.raster_tool import RasterTool
-    #     RasterTool.maskRasterByRaster(tif_path, self.config['gridFilePath'], tif_path,
-    #                                 mask_nodata=0, dst_nodata=0, srs_nodata=0)
-        
-    #     # 如果是市县级区域，使用GDAL直接裁剪结果
-    #     temp_shp_path = self.config.get('tempShpFilePath')
-    #     if temp_shp_path and Path(temp_shp_path).exists():
-    #         tif_path = DataPreprocessor.clip_raster_to_region(tif_path, temp_shp_path, self.area_code)
-        
-    #     # 写入结果到rjson
-    #     if tif_path:
-    #         self.rjson.info("result", [tif_path, "NYQH_NZW", "农作物气候区划", "QH", "TIFF"])
-                
-    #     # 生成PNG专题图
-    #     png_filename = self._generate_output_filename("png")
-    #     png_path = os.path.join(self.result_path, png_filename)
-        
-    #     # 准备QGIS矢量文件并生成专题图
-    #     self.preprocessor.prepare_qgis_shp_files()
-    #     self._generate_qgis_map(tif_path, png_path)
-    #     self.fjson.log(f"专题图已生成: {png_path}")
-
-    #     if png_path:
-    #         self.rjson.info("result", [png_path, "NYQH_NZW", "农作物气候区划专题图", "QH", "PNG"])
-
-             
+           
     def _save_results(self, zoning_result: Dict[str, Any]):
         """保存结果 - 使用GDAL直接裁剪市县级数据"""
         # 生成输出文件名
@@ -546,7 +512,9 @@ class ZoningProcessor:
         
         # 根据areaCode长度和格式判断区域级别
         if len(area_code) == 6:
-            if area_code.endswith('0000'):  # 省级
+            if area_code == "000000":
+                return area_code,"全国"
+            elif area_code.endswith('0000'):  # 省级
                 # 匹配省代码
                 province_match = admin_df[admin_df['省代码'] == area_code]
                 if not province_match.empty:

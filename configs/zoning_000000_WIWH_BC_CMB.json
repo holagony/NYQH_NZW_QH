@@ -1,0 +1,11 @@
+{
+    "indicators": {},
+    "interpolation": {
+        "method": "idw"
+        },
+    "classification": {
+        "method": "natural_breaks",
+        "num_classes": 4
+    }
+}
+
