@@ -1,18 +1,18 @@
 {
   "taskId": "123456",
-  "algoFrom": "zoning_230000_SPSO_ZH_SD",
-  "cropCode": "SPSO",
-  "zoningType": "ZH",
+  "algoFrom": "zoning_650000_WIWH_ZZ_QHSYX",
+  "cropCode": "WIWH",
+  "zoningType": "ZZ",
   "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
-  "areaCode": "230000",
-  "areaName": "黑龙江",
-  "element": "SD",
+  "areaCode": "650000",
+  "areaName": "新疆维吾尔自治区",
+  "element": "QHSYX",
   "startDate": "19910101",
   "endDate": "20201231",
   "stationFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/station.csv",  
-  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/230000_30grid.tif",
-  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/230000_dem.tif",
-  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/230000_wgs84.shp",
+  "gridFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/grid/650000_30grid.tif",
+  "demFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/650000_dem.tif",
+  "shpFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/shp/650000_wgs84.shp",
   
   
   "dependDir":"/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
@@ -37,6 +37,6 @@
   "resultLogPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SD_230000/resultLogFile.json",
   "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SD_230000/resultJsonFile.json",
   "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SD_230000/resultFlowFile.json",
-  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_SD_230000/",
+  "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/WIWH_ZZ/2/",
   "algorithmConfig": {}
 }

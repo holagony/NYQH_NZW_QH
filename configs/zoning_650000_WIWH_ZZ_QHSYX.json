@@ -1,0 +1,73 @@
+{
+    "indicators": {
+        "acc_tmp": {
+            "type": "conditional_sum",
+            "start_date": "01-01",
+            "end_date": "12-31",
+            "frequency": "lta",
+            "variable": "tavg",
+            "conditions":[
+                {
+                    "variable": "tavg",
+                    "operator": ">=",
+                    "value": "10"
+                }
+            ],
+            "desc":"大于等于10℃积温"
+        },
+        "tmin_extr": {
+            "type": "period_extreme",
+            "extreme_type":"min",
+            "frequency": "lta",
+            "start_date": "12-01",
+            "end_date": "02-28",
+            "variable": "tmin",
+            "year_offset": 1,
+            "desc":"冬季极端最低气温"
+        },
+        "sd_max": {
+            "type": "period_extreme",
+            "extreme_type":"max",
+            "start_date": "12-01",
+            "end_date": "12-31",
+            "frequency": "lta",
+            "variable":"sd",
+            "desc":"12月最大积雪深度"
+        },
+        "tmax_d": {
+            "type": "conditional_count",
+            "start_date": "05-01",
+            "end_date": "06-30",
+            "frequency": "lta",
+            "conditions":[
+                {
+                    "variable": "tmax",
+                    "operator": ">=",
+                    "value": "35"
+                }
+            ],
+            "desc":"5-6月日最高气温大于等于35摄氏度日数"
+        }
+    },
+    "formula": {
+    },
+    "interpolation": {
+        "method": "lsm_idw",
+        "params": {
+            "radius_dist": 2.5,
+            "min_num": 8,
+            "first_size": 150
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes":4,
+        "thresholds": [
+            {"level": 4, "label": "不适宜区","min":"3", "max":"" },
+            {"level": 3, "label": "次适宜区", "min": "2", "max": "3"},
+            {"level": 2, "label": "适宜区", "min": "1", "max": "2"},
+            {"level": 1, "label": "最适宜区", "min":"" ,"max":"1"}
+        ]
+    }
+}
+

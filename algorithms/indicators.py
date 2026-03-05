@@ -1236,7 +1236,6 @@ class IndicatorCalculator:
         
         # 构建条件表达式并应用
         condition_expr = self._build_condition_expression(conditions)
-        
         if condition_expr:
             try:
                 # 使用query方法进行条件筛选

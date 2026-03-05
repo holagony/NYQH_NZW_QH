@@ -1,0 +1,56 @@
+{
+    "indicators": {
+    },
+    "nanjiang_beijiang": {
+        "北疆": {
+            "start_date": "05-01",
+            "end_date": "06-20",
+            "area": [
+            "昌吉回族自治州",
+            "伊犁哈萨克自治州",
+            "塔城地区",
+            "阿勒泰地区",
+            "哈密市",
+            "乌鲁木齐市",
+            "博尔塔拉蒙古自治州",
+            "克拉玛依市",
+            "石河子市",
+            "五家渠市"
+        ]
+        },
+        "南疆": {
+            "start_date": "04-21",
+            "end_date": "06-10",
+            "area": [
+            "巴音郭楞蒙古自治州",
+            "喀什地区",
+            "阿克苏地区",
+            "和田地区",
+            "克孜勒苏柯尔克孜自治州",
+            "吐鲁番市",
+            "阿拉尔市"
+        ]
+        }
+    },
+    "interpolation": {
+        "order": "before",
+        "method": "lsm_idw",
+        "params": {
+            "radius_dist": 2.5,
+            "min_num": 8,
+            "first_size": 150
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes": 4,
+        "reverse_order": "False",
+        "thresholds": [
+        {"min": "","max": 0.3617, "level": 4, "label": "低风险"},    
+        {"min": 0.3617, "max": 0.3962, "level": 3, "label": "中风险"},  
+        {"min": 0.3962, "max": 0.4745, "level": 2, "label": "高风险"},  
+        {"min": 0.4745, "max": "","level": 1, "label": "极高风险"}   
+        ]
+    }
+}
+

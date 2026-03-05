@@ -33,6 +33,7 @@ class DataManager:
             "RHU_Avg": "rhum",
             "PRE_Time_2020": "precip",
             "WIN_S_2mi_Avg": "wind",
+            "Snow_Depth":"sd",
             "Station_Id_C": "station_id",
             "Lat": "lat",
             "Lon": "lon",
@@ -670,7 +671,7 @@ class DataManager:
         data = data.set_index('date')
         
         # 转换数值字段
-        numeric_columns = ['tavg', 'tmax', 'tmin', 'sunshine', 'rhum', 'precip','wind', 'lat', 'lon', 'altitude']
+        numeric_columns = ['tavg', 'tmax', 'tmin', 'sunshine', 'rhum', 'precip','wind', 'sd','lat', 'lon', 'altitude']
         for col in numeric_columns:
             if col in data.columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce')
