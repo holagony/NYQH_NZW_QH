@@ -1,0 +1,43 @@
+{
+    "indicators": {},
+    "interpolation": {
+        "method": "idw",
+        "params": {
+            "power": 2
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "num_classes": 5,
+        "classes": [
+            {
+                "label": "非种植区",
+                "max": 0,
+                "value": 0
+            },
+            {
+                "label": "低风险",
+                "min": 0,
+                "max": 10,
+                "value": 1
+            },
+            {
+                "label": "中风险",
+                "min": 10,
+                "max": 20,
+                "value": 2
+            },
+            {
+                "label": "高风险",
+                "min": 20,
+                "max": 30,
+                "value": 3
+            },
+            {
+                "label": "极高风险",
+                "min": 30,
+                "value": 4
+            }
+        ]
+    }
+}
