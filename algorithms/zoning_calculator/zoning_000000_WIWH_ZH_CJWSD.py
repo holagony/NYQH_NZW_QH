@@ -24,6 +24,16 @@ def _normalize_array(array):
     return out
 
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
+
 class WIWH_ZH:
     """全国冬小麦晚霜冻灾害区划计算器
     
@@ -207,9 +217,17 @@ class WIWH_ZH:
             r = self._calc_late_frost_index(daily, gp, years, stage_start=stage_start, stage_end=stage_end)
             station_values[sid] = float(r) if np.isfinite(r) else np.nan
 
-        # 插值与栅格归一化
+        # 插值与掩膜（先插值，再掩膜），随后归一化
         interp = self._interpolate(station_values, station_coords, cfg, algorithm_config)
-        interp['data'] = _normalize_array(interp['data'])
+        data_after_interp = interp['data']
+        mask_path = cfg.get("maskFilePath")
+        if mask_path:
+            mask_arr = _mask_to_target_grid(mask_path, interp['meta'])
+            data_after_interp = (data_after_interp if mask_arr is None
+                                 else (data_after_interp * (mask_arr == 1) + np.nan * (mask_arr != 1)))
+            data_after_interp = np.where(mask_arr == 1, data_after_interp, np.nan)
+        data_after_interp = _normalize_array(data_after_interp)
+        interp['data'] = data_after_interp
         # 输出路径与中间产品
         out_dir = Path(cfg.get("resultPath") or os.getcwd())
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -217,6 +235,7 @@ class WIWH_ZH:
         inter_dir.mkdir(parents=True, exist_ok=True)
         tif_path = str(inter_dir / "全国冬小麦晚霜冻指数.tif")
         self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)
+        
         # 分类（可选）
         class_conf = algorithm_config.get('classification', {})
         data_out = interp['data']

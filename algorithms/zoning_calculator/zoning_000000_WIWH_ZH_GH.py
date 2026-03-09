@@ -10,24 +10,6 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-def _normalize_array(array):
-    """栅格归一化到 [0,1]，保留 NaN；常数场归一化为 0.5"""
-    if array.size == 0:
-        return array
-    mask = ~np.isnan(array)
-    if not np.any(mask):
-        return array
-    valid = array[mask].astype(float)
-    mn = float(np.min(valid))
-    mx = float(np.max(valid))
-    if mx == mn:
-        out = np.full_like(array, 0.5, dtype=float)
-    else:
-        out = (array.astype(float) - mn) / (mx - mn)
-    out[~mask] = np.nan
-    return out
-
-
 def _build_kc_series_from_months_map(months_map, start_year, end_year):
     start_dt = pd.Timestamp(int(start_year), 1, 1)
     end_dt = pd.Timestamp(int(end_year), 12, 31)
@@ -38,53 +20,23 @@ def _build_kc_series_from_months_map(months_map, start_year, end_year):
             s[idx.month == int(m)] = float(val)
     return s
 
-def _compute_g_worker(args):
-    sid, input_path, station_file_path, start_date, end_date, area_code, expected_prov, months_map, cwdi_conf = args
-    dm = DataManager(input_path, station_file_path, multiprocess=False, num_processes=1)
-    daily = dm.load_station_data(sid, start_date, end_date)
-    info = dm.get_station_info(sid)
-    st_code = str(info.get('PAC_prov', ''))
-    st_prov = str(info.get('province', '')).strip()
-    if (st_code and (st_code == str(area_code))) or (expected_prov and (st_prov == expected_prov)):
-        sy = int(str(start_date)[:4])
-        ey = int(str(end_date)[:4])
-        kc_series = _build_kc_series_from_months_map(months_map, sy, ey)
-        daily['kc'] = kc_series.reindex(daily.index).fillna(0.0)
-    else:
-        daily['kc'] = pd.Series(0.0, index=daily.index)
-    calc = WIWH_ZH()
-    g = calc._calc_drought_station_g(daily, cwdi_conf)
-    coord = {
-        'lat': float(info.get('lat', np.nan)),
-        'lon': float(info.get('lon', np.nan)),
-        'altitude': float(info.get('altitude', np.nan))
-    }
-    val = float(g) if np.isfinite(g) else np.nan
-    return sid, val, coord
-
+ 
 def _compute_g_batch_worker(args):
-    sids, input_path, station_file_path, start_date, end_date, area_code, expected_prov, months_map, cwdi_conf, allowed_codes, allowed_names = args
+    sids, input_path, station_file_path, start_date, end_date, prov_kc_table, cwdi_conf = args
     dm = DataManager(input_path, station_file_path, multiprocess=False, num_processes=1)
     out_vals = {}
     out_coords = {}
     sy = int(str(start_date)[:4])
     ey = int(str(end_date)[:4])
-    kc_series = _build_kc_series_from_months_map(months_map, sy, ey)
     calc = WIWH_ZH()
     for sid in sids:
         daily = dm.load_station_data(sid, start_date, end_date)
         info = dm.get_station_info(sid)
-        st_code = str(info.get('PAC_prov', ''))
         st_prov = str(info.get('province', '')).strip()
-        in_six = (st_code in allowed_codes) or (st_prov in allowed_names)
-        if (st_code and (st_code == str(area_code))) or (expected_prov and (st_prov == expected_prov)):
+        if st_prov in prov_kc_table:
+            months_map = prov_kc_table[st_prov]
+            kc_series = _build_kc_series_from_months_map(months_map, sy, ey)
             daily['kc'] = kc_series.reindex(daily.index).fillna(0.0)
-        elif not in_six:
-            m = daily.index.month
-            kc = pd.Series(0.0, index=daily.index)
-            mask_winter = (m <= 6) | (m >= 10)
-            kc[mask_winter] = 1.0
-            daily['kc'] = kc
         else:
             daily['kc'] = pd.Series(0.0, index=daily.index)
         g = calc._calc_drought_station_g(daily, cwdi_conf)
@@ -95,6 +47,36 @@ def _compute_g_batch_worker(args):
             'altitude': float(info.get('altitude', np.nan))
         }
     return out_vals, out_coords
+
+
+def _get_prov_kc_table():
+    t = {
+        "山西省": {1:0.14,2:0.24,3:0.58,4:1.04,5:1.24,6:0.84,7:0.0,8:0.0,9:0.0,10:0.54,11:0.76,12:0.4},
+        "甘肃省": {1:0.14,2:0.24,3:0.58,4:1.04,5:1.24,6:0.84,7:0.0,8:0.0,9:0.0,10:0.54,11:0.76,12:0.4},
+        "宁夏回族自治区": {1:0.14,2:0.24,3:0.58,4:1.04,5:1.24,6:0.84,7:0.0,8:0.0,9:0.0,10:0.54,11:0.76,12:0.4},
+        "河北省": {1:0.33,2:0.24,3:0.42,4:1.14,5:1.42,6:0.73,7:0.0,8:0.0,9:0.0,10:0.85,11:0.92,12:0.54},
+        "北京市": {1:0.33,2:0.24,3:0.42,4:1.14,5:1.42,6:0.73,7:0.0,8:0.0,9:0.0,10:0.85,11:0.92,12:0.54},
+        "天津市": {1:0.33,2:0.24,3:0.42,4:1.14,5:1.42,6:0.73,7:0.0,8:0.0,9:0.0,10:0.85,11:0.92,12:0.54},
+        "陕西省": {1:0.33,2:0.24,3:0.42,4:1.14,5:1.42,6:0.73,7:0.0,8:0.0,9:0.0,10:0.85,11:0.92,12:0.54},
+        "河南省": {1:0.31,2:0.5,3:0.91,4:1.4,5:1.29,6:0.6,7:0.0,8:0.0,9:0.0,10:0.63,11:0.83,12:0.93},
+        "山东省": {1:0.64,2:0.41,3:0.9,4:1.22,5:1.13,6:0.83,7:0.0,8:0.0,9:0.0,10:0.67,11:0.7,12:0.74},
+        "安徽省": {1:1.13,2:1.14,3:1.07,4:1.16,5:0.87,6:0.4,7:0.0,8:0.0,9:0.0,10:1.18,11:1.15,12:1.25},
+        "江苏省": {1:0.82,2:0.91,3:0.86,4:1.77,5:1.43,6:0.41,7:0.0,8:0.0,9:0.0,10:1.14,11:1.14,12:1.19},
+        "湖北省": {1:0.82,2:0.91,3:0.86,4:1.77,5:1.43,6:0.41,7:0.0,8:0.0,9:0.0,10:1.14,11:1.14,12:1.19},
+        "新疆维吾尔自治区": {1:0.14,2:0.24,3:0.58,4:1.04,5:1.24,6:0.84,7:0.0,8:0.0,9:0.0,10:0.54,11:0.76,12:0.4},
+        "西藏自治区": {1:0.14,2:0.24,3:0.58,4:1.04,5:1.24,6:1.14,7:0.0,8:0.0,9:0.0,10:0.54,11:0.76,12:0.4},
+        "四川省": {1:1.14,2:1.14,3:1.42,4:1.42,5:0.83,6:0.4,7:0.0,8:0.0,9:0.0,10:0.4,11:0.93,12:1.14},
+        "云南省": {1:1.14,2:1.14,3:1.42,4:1.42,5:0.83,6:0.4,7:0.0,8:0.0,9:0.0,10:0.4,11:0.93,12:1.14},
+        "贵州省": {1:1.14,2:1.14,3:1.42,4:1.42,5:0.83,6:0.4,7:0.0,8:0.0,9:0.0,10:0.4,11:0.93,12:1.14},
+        "重庆市": {1:1.14,2:1.14,3:1.42,4:1.42,5:0.83,6:0.4,7:0.0,8:0.0,9:0.0,10:0.4,11:0.93,12:1.14},
+        "湖南省": {1:0.82,2:0.91,3:0.86,4:1.77,5:1.43,6:0.41,7:0.0,8:0.0,9:0.0,10:1.14,11:1.14,12:1.19},
+        "上海市": {1:0.82,2:0.91,3:0.86,4:1.77,5:1.43,6:0.41,7:0.0,8:0.0,9:0.0,10:1.14,11:1.14,12:1.19},
+        "浙江省": {1:0.82,2:0.91,3:0.86,4:1.77,5:1.43,6:0.41,7:0.0,8:0.0,9:0.0,10:1.14,11:1.14,12:1.19},
+        "江西省": {1:0.82,2:0.91,3:0.86,4:1.77,5:1.43,6:0.41,7:0.0,8:0.0,9:0.0,10:1.14,11:1.14,12:1.19},
+        "广西壮族自治区": {1:1.14,2:1.14,3:1.42,4:1.42,5:0.83,6:0.4,7:0.0,8:0.0,9:0.0,10:0.4,11:0.93,12:1.14}
+    }
+    return t
+
 
 def _prepare_mask_sampler(mask_path):
     ds = gdal.Open(mask_path)
@@ -129,6 +111,7 @@ def _prepare_mask_sampler(mask_path):
         return arr[0, 0]
     return sample
 
+
 def _mask_to_target_grid(mask_path, meta):
     src = gdal.Open(mask_path)
     drv = gdal.GetDriverByName('MEM')
@@ -138,6 +121,7 @@ def _mask_to_target_grid(mask_path, meta):
     gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
     arr = dst.GetRasterBand(1).ReadAsArray()
     return arr
+
 class WIWH_ZH:
     """全国冬小麦干旱区划计算器"""
 
@@ -376,26 +360,6 @@ class WIWH_ZH:
             out[~mask] = np.nan
         return out
     
-    def _kc_series_from_table(self, area_code, kc_table, start_year, end_year):
-        # 从配置表提取指定区域的月尺度 Kc，并扩展为日序列
-        months_map = {}
-        if isinstance(kc_table, dict):
-            row = kc_table.get(str(area_code)) or kc_table.get(int(area_code)) if area_code is not None else None
-            if isinstance(row, dict):
-                for k, v in row.items():
-                    try:
-                        m = int(k)
-                        months_map[m] = float(v)
-                    except:
-                        continue
-        start_dt = pd.Timestamp(int(start_year), 1, 1)
-        end_dt = pd.Timestamp(int(end_year), 12, 31)
-        idx = pd.date_range(start=start_dt, end=end_dt, freq='D')
-        s = pd.Series(0.0, index=idx)
-        if months_map:
-            for m, val in months_map.items():
-                s[idx.month == int(m)] = float(val)
-        return s
 
     def _calc_drought_station_g(self, daily, cwdi_conf):
         # 计算站点 CWDI，并按指定生育期/年度窗口聚合为年度超阈积分
@@ -440,61 +404,31 @@ class WIWH_ZH:
 
         # 2) 加载数据管理器与站点清单
         dm = DataManager(cfg.get('inputFilePath'), cfg.get('stationFilePath'), multiprocess=False, num_processes=1)
-        area_name_map = {
-            "140000": "山西省",
-            "130000": "河北省",
-            "410000": "河南省",
-            "370000": "山东省",
-            "340000": "安徽省",
-            "320000": "江苏省"
-        }
         mask_path = cfg.get('maskFilePath')
-        sample_mask = _prepare_mask_sampler(mask_path)
         candidate_ids = list(station_coords.keys()) if isinstance(station_coords, dict) and station_coords else dm.get_all_stations()
         available = set(dm.get_all_stations())
         candidate_ids = [sid for sid in candidate_ids if sid in available]
         station_ids = []
+        prov_kc_table = _get_prov_kc_table()
+        allowed_names = set(prov_kc_table.keys())
+        prov_counts = {}
         for sid in candidate_ids:
             info = dm.get_station_info(sid)
-            lon = float(info.get('lon', np.nan))
-            lat = float(info.get('lat', np.nan))
-            if np.isnan(lon) or np.isnan(lat):
-                continue
-            v = sample_mask(lon, lat)
-            try:
-                vv = float(v)
-            except:
-                vv = np.nan
-            if np.isfinite(vv) and vv == 1.0:
+            st_prov = str(info.get('province', '')).strip()
+            if st_prov in allowed_names:
                 station_ids.append(sid)
-        print(f"Total stations: {len(station_ids)}")
+                prov_counts[st_prov] = prov_counts.get(st_prov, 0) + 1
+        for name, cnt in prov_counts.items():
+            print(f"{name}：{cnt}个")
+        print(f"总计：{sum(prov_counts.values())}个")
+
         start_date = params.get('startDate') or cfg.get('startDate')
         end_date = params.get('endDate') or cfg.get('endDate')
-        start_year = int(str(start_date)[:4])
-        end_year = int(str(end_date)[:4])
-        area_code = cfg.get('areaCode')
-        kc_table = cfg.get('kc_table', {})
-        if not kc_table:
-            kc_table = cwdi_conf.get('kc_table', {})
-
         # 3) 准备 Kc 配置与容器
         station_values = {}
-        expected_prov = str(cfg.get('provinceName') or area_name_map.get(str(area_code), '')).strip()
-        
-        # 4) 并行计算站点干旱强度 g
-        months_map = {}
-        if isinstance(kc_table, dict):
-            row = kc_table.get(str(area_code)) or kc_table.get(int(area_code)) if area_code is not None else None
-            if isinstance(row, dict):
-                for k, v in row.items():
-                    try:
-                        months_map[int(k)] = float(v)
-                    except:
-                        continue
+        # 4) 并行计算站点干旱强度 g（省份按表赋值）
         sel_coords = {}
-        allowed_codes = set(area_name_map.keys())
-        allowed_names = set(area_name_map.values())
-        args_common = (cfg.get('inputFilePath'), cfg.get('stationFilePath'), start_date, end_date, area_code, expected_prov, months_map, cwdi_conf, allowed_codes, allowed_names)
+        args_common = (cfg.get('inputFilePath'), cfg.get('stationFilePath'), start_date, end_date, prov_kc_table, cwdi_conf)
         max_workers = 16
         chunk_size = max(1, len(station_ids) // (max_workers * 2) + 1)
         with ProcessPoolExecutor(max_workers=max_workers) as ex:
@@ -514,7 +448,7 @@ class WIWH_ZH:
         # 5) 空间插值生成干旱强度栅格（仅掩膜区域）
         interp = self._interpolate(station_values, sel_coords, cfg, algorithm_config)
         mask_arr = _mask_to_target_grid(mask_path, interp['meta'])
-        interp_data_masked = np.where(mask_arr == 1, interp['data'], np.nan)
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(interp['data'], 0.0), np.nan)
         
         # 6) 输出中间与最终结果到 GeoTIFF
         out_dir = Path(cfg.get("resultPath") or os.getcwd())
@@ -535,6 +469,7 @@ class WIWH_ZH:
                     {'min': 2000, 'max': '', 'level': 4, 'label': '特旱'}
                 ]
             }
+
         method = class_conf.get('method', 'custom_thresholds')
         classifier = self._get_algorithm(f"classification.{method}")
         if method == 'custom_thresholds':
@@ -552,6 +487,7 @@ class WIWH_ZH:
             data_out = np.where(mask_arr == 1, data_out, np.nan)
             final_tif = str(out_dir / "干旱强度指数_分级.tif")
             self._save_geotiff_gdal(np.array(data_out).astype(np.float32), interp['meta'], final_tif, 0)
+        
         return {
             'data': np.array(data_out),
             'meta': {

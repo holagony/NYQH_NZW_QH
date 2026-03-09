@@ -19,6 +19,7 @@
   "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/000000_WIWH_ZH_GRF/resultFlowFile.json",
   "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/000000_WIWH_ZH_GRF",
   "dependDir": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
+  "maskFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/NYQH_NZW_QH/test/全国冬小麦种植范围1991-2020.tif",
   "growthPeriodPath": "./test/WIWH_growth_period.xlsx",
   "algorithmConfig": {}
 }
