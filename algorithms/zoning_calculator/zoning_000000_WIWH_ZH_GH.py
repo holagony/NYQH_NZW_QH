@@ -388,8 +388,8 @@ class WIWH_ZH:
         sums = []
         for y in years:
             seg = series[series.index.year == y]
-            # 超过 40 的日值求和（不减去 40）
-            exceed = np.where(seg > 40.0, seg, 0.0)
+            # 超过 40 的日值求和
+            exceed = np.where(seg > 40.0, seg - 40.0, 0.0)
             sums.append(float(np.nansum(exceed)))
         # 多年平均作为站点干旱强度 g
         return float(np.nanmean(sums))

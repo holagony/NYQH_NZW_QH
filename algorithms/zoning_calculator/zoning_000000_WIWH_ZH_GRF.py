@@ -4,6 +4,7 @@ import pandas as pd
 from pathlib import Path
 from osgeo import gdal
 from algorithms.data_manager import DataManager
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 def _mask_to_target_grid(mask_path, meta):
@@ -32,6 +33,34 @@ def _normalize_array(array):
         out = (array.astype(float) - mn) / (mx - mn)
     out[~mask] = np.nan
     return out
+
+
+def _compute_grf_batch_worker(args):
+    """
+    并行子任务：批量计算站点干热风指数
+    args: (sids, input_path, station_file_path, start_date, end_date, growth_map, years, stage_start, stage_end, thresholds, weights, marks)
+    """
+    (sids, input_path, station_file_path, start_date, end_date,
+     growth_map, years, stage_start, stage_end, thresholds, weights, marks) = args
+    dm = DataManager(input_path, station_file_path, multiprocess=False, num_processes=1)
+    calc = WIWH_ZH()
+    out_vals = {}
+    out_coords = {}
+    for sid in sids:
+        daily = dm.load_station_data(sid, start_date, end_date)
+        gp = growth_map.get(str(sid).strip())
+        hd = calc._calc_dryhotwind_index(
+            daily, gp, years, stage_start=stage_start, stage_end=stage_end,
+            thresholds=thresholds, weights=weights, marks=marks
+        )
+        out_vals[sid] = float(hd) if np.isfinite(hd) else np.nan
+        info = dm.get_station_info(sid)
+        out_coords[sid] = {
+            'lat': float(info.get('lat', np.nan)),
+            'lon': float(info.get('lon', np.nan)),
+            'altitude': float(info.get('altitude', np.nan))
+        }
+    return out_vals, out_coords
 
 
 class WIWH_ZH:
@@ -206,9 +235,7 @@ class WIWH_ZH:
         station_ids = [sid for sid in station_ids if sid in available]
         start_date = params.get('startDate') or cfg.get('startDate')
         end_date = params.get('endDate') or cfg.get('endDate')
-        start_year = int(str(start_date)[:4])
-        end_year = int(str(end_date)[:4])
-        years = list(range(start_year, end_year + 1))
+        start_year = int(str(start_date)[:4]); end_year = int(str(end_date)[:4]); years = list(range(start_year, end_year + 1))
 
         growth_path = (cfg.get("growthPeriodPath") or params.get("growthPeriodPath"))
         if not growth_path:
@@ -238,33 +265,34 @@ class WIWH_ZH:
         weights = {"light": 0.2, "moderate": 0.3, "severe": 0.5}
         marks = {"light": 1.0, "moderate": 2.0, "severe": 3.0}
 
+        # 并行计算站点指数（16核）
         station_values = {}
-        for sid in station_ids:
-            daily = dm.load_station_data(sid, start_date, end_date)
-            gp = growth_map.get(str(sid).strip())
-            hd = self._calc_dryhotwind_index(
-                daily,
-                gp,
-                years,
-                stage_start=stage_start,
-                stage_end=stage_end,
-                thresholds=thresholds,
-                weights=weights,
-                marks=marks,
-            )
-            station_values[sid] = float(hd) if np.isfinite(hd) else np.nan
+        sel_coords = {}
+        args_common = (cfg.get('inputFilePath'), cfg.get('stationFilePath'), start_date, end_date,
+                       growth_map, years, stage_start, stage_end, thresholds, weights, marks)
+        max_workers = 16
+        chunk_size = max(1, len(station_ids) // (max_workers * 2) + 1)
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            futures = []
+            for i in range(0, len(station_ids), chunk_size):
+                chunk = station_ids[i:i + chunk_size]
+                futures.append(ex.submit(_compute_grf_batch_worker, (chunk, *args_common)))
+            for fut in as_completed(futures):
+                vals, coords = fut.result()
+                station_values.update(vals)
+                if isinstance(station_coords, dict) and station_coords:
+                    for sid, coord in coords.items():
+                        sel_coords[sid] = station_coords.get(sid, coord)
+                else:
+                    sel_coords.update(coords)
 
         # 插值与掩膜（先插值，再掩膜），随后归一化
-        interp = self._interpolate(station_values, station_coords, cfg, algorithm_config)
-        data_after_interp = interp['data']
-        mask_path = cfg.get("maskFilePath")
-        if mask_path:
-            mask_arr = _mask_to_target_grid(mask_path, interp['meta'])
-            data_after_interp = (data_after_interp if mask_arr is None
-                                 else (data_after_interp * (mask_arr == 1) + np.nan * (mask_arr != 1)))
-            data_after_interp = np.where(mask_arr == 1, data_after_interp, np.nan)
-        data_after_interp = _normalize_array(data_after_interp)
-        interp['data'] = data_after_interp
+        interp = self._interpolate(station_values, sel_coords, cfg, algorithm_config)
+        mask_path = cfg.get('maskFilePath')
+        mask_arr = _mask_to_target_grid(mask_path, interp['meta'])
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(interp['data'], 0.0), np.nan)
+        interp['data'] = interp_data_masked
+
         # 输出路径与中间产品
         out_dir = Path(cfg.get("resultPath") or os.getcwd())
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -272,13 +300,24 @@ class WIWH_ZH:
         inter_dir.mkdir(parents=True, exist_ok=True)
         tif_path = str(inter_dir / "全国冬小麦干热风指数.tif")
         self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)
-        # 分类（可选）
+        
+        # 分类（可选）：对齐 GH 处理逻辑
         class_conf = algorithm_config.get('classification', {})
         data_out = interp['data']
         if class_conf:
             method = class_conf.get('method', 'natural_breaks')
             classifier = self._get_algorithm(f"classification.{method}")
-            data_out = classifier.execute(interp['data'].astype(float), class_conf)
+            if method == 'custom_thresholds':
+                data_out = classifier.execute(interp['data'].astype(float), class_conf)
+                if mask_path:
+                    data_out = np.where(mask_arr == 1, data_out, np.nan)
+            else:
+                norm = _normalize_array(interp['data'])
+                norm_tif = str(inter_dir / "全国冬小麦干热风指数_归一化.tif")
+                self._save_geotiff_gdal(norm.astype(np.float32), interp['meta'], norm_tif, 0)
+                data_out = classifier.execute(norm.astype(float), class_conf)
+                if mask_path:
+                    data_out = np.where(mask_arr == 1, data_out, np.nan)
         # 最终产品
         final_tif = str(out_dir / "全国冬小麦干热风_分级.tif")
         self._save_geotiff_gdal(np.array(data_out).astype(np.float32), interp['meta'], final_tif, 0)
