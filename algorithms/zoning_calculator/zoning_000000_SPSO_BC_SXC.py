@@ -4,23 +4,7 @@ import pandas as pd
 from pathlib import Path
 from osgeo import gdal
 from algorithms.data_manager import DataManager
-
-
-def _normalize_array(array):
-    if array.size == 0:
-        return array
-    mask = ~np.isnan(array)
-    if not np.any(mask):
-        return array
-    valid = array[mask].astype(float)
-    mn = float(np.min(valid))
-    mx = float(np.max(valid))
-    if mx == mn:
-        out = np.full_like(array, 0.5, dtype=float)
-    else:
-        out = (array.astype(float) - mn) / (mx - mn)
-    out[~mask] = np.nan
-    return out
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 class SPSO_BC:
@@ -69,27 +53,79 @@ class SPSO_BC:
             'dem_path': config.get("demFilePath", ""),
             'shp_path': config.get("shpFilePath", ""),
             'grid_path': config.get("gridFilePath", ""),
-            'area_code': config.get("areaCode", "")
-        }
+            'area_code': config.get("areaCode", "")}
         result = interpolator.execute(data, interpolation_params)
         return result
 
-    def _compute_bean_moth_F(self, daily, current_year):
+    def _doc_predictors(self, daily, current_year):
         if daily is None or len(daily) == 0:
-            return np.nan
+            return np.nan, np.nan, np.nan
+        tmin = daily["tmin"] if "tmin" in daily.columns else pd.Series(index=daily.index, dtype=float)
         tavg = daily["tavg"] if "tavg" in daily.columns else pd.Series(index=daily.index, dtype=float)
-        rhum = daily["rhum"] if "rhum" in daily.columns else pd.Series(index=daily.index, dtype=float)
+        precip = daily["precip"] if "precip" in daily.columns else pd.Series(index=daily.index, dtype=float)
+        x1 = tmin[(tmin.index.year == current_year) & (tmin.index.month == 1)].mean()
+        def _dekad_ranges(year, month):
+            import calendar
+            _, ndays = calendar.monthrange(year, month)
+            return [(1, 10), (11, 20), (21, ndays)]
+        dekads = _dekad_ranges(current_year, 5) + _dekad_ranges(current_year, 6)
+        x2 = 0.0
+        valid = True
+        for d0, d1 in dekads:
+            mask = (tavg.index.year == current_year) & ((tavg.index.month == 5) | (tavg.index.month == 6)) & (tavg.index.day >= d0) & (tavg.index.day <= d1)
+            m = tavg[mask].mean()
+            if pd.isna(m):
+                valid = False
+                break
+            x2 += float(m)
+        if not valid:
+            x2 = np.nan
         prev_year = int(current_year) - 1
-        t9 = tavg[(tavg.index.month == 9) & (tavg.index.year == prev_year) & (tavg.index.day >= 21)].mean()
-        t12 = tavg[(tavg.index.month == 12) & (tavg.index.year == prev_year)].mean()
-        t4 = tavg[(tavg.index.month == 4) & (tavg.index.year == current_year) & (tavg.index.day <= 10)].mean()
-        t56 = tavg[((tavg.index.month == 5) | (tavg.index.month == 6)) & (tavg.index.year == current_year)].mean()
-        h8 = rhum[(rhum.index.month == 8) & (rhum.index.year == current_year)].mean()
-        vals = [t9, t12, t4, t56, h8]
-        if any(pd.isna(v) for v in vals):
+        x3 = precip[(precip.index.year == prev_year) & (precip.index.month == 9) & (precip.index.day >= 11) & (precip.index.day <= 20)].sum()
+        return x1, x2, x3
+
+    def _classify_rate_level(self, rate):
+        if pd.isna(rate):
+            return None
+        r = float(rate)
+        if r <= 25:
+            return 1
+        if r <= 35:
+            return 2
+        if r <= 45:
+            return 3
+        return 4
+
+    def _compute_hazard_index(self, daily, years):
+        '''
+        1.对每个年份 y：
+            计算 x1_y、x2_y、x3_y（逐年定义：x1为1月tmin月平均；x2为5–6月6旬的tavg旬平均累积；x3为上年9月中旬降水量之和）
+            用式(6.1)得到当年虫食率；按表6.1映射等级
+        2.统计各等级频率 F_ij
+        3.用表6.3权重合成 H_i
+        '''
+        weights = {1: 0.055, 2: 0.118, 3: 0.262, 4: 0.565}
+        levels = []
+        b1 = -1.1507
+        b2 = 0.7855
+        b3 = 0.2336
+        b0 = -24.4108
+        for y in years:
+            x1, x2, x3 = self._doc_predictors(daily, y)
+            if not any(pd.isna(v) for v in [x1, x2, x3]):
+                rate = float(b0) + b1 * float(x1) + b2 * float(x2) + b3 * float(x3)
+                lvl = self._classify_rate_level(rate)
+                if lvl is not None:
+                    levels.append(lvl)
+        n = len(levels)
+        if n == 0:
             return np.nan
-        f = 0.157 * float(t9) + 0.113 * float(t12) + 0.066 * float(t4) + 0.357 * float(t56) + 0.311 * float(h8)
-        return float(f)
+        freq = {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0}
+        for lvl in levels:
+            freq[lvl] += 1.0
+        for j in freq:
+            freq[j] = freq[j] / n
+        return float(sum(freq[j] * weights[j] for j in (1, 2, 3, 4)))
 
     def calculate_SXC(self, params):
         self._algorithms = params['algorithms']
@@ -102,49 +138,49 @@ class SPSO_BC:
         station_ids = [sid for sid in station_ids if sid in available]
         start_date = params.get('startDate') or cfg.get('startDate')
         end_date = params.get('endDate') or cfg.get('endDate')
-        current_year = int(str(end_date)[:4]) if end_date else int(str(start_date)[:4])
+        sy = int(str(start_date)[:4]) if start_date else None
+        ey = int(str(end_date)[:4]) if end_date else None
+        years = list(range(sy, ey + 1))
+        load_start = f"{years[0]-1}0901"
+        load_end = f"{years[-1]}0630"
 
-        station_values = {}
-        for sid in station_ids:
-            daily = dm.load_station_data(sid, start_date, end_date)
-            f = self._compute_bean_moth_F(daily, current_year)
-            station_values[sid] = float(f) if np.isfinite(f) else np.nan
+        hazard_values = {}
+        max_workers = 16
+        chunk_size = max(1, len(station_ids) // (max_workers * 2) + 1)
+        args_common = (cfg.get('inputFilePath'), cfg.get('stationFilePath'), load_start, load_end, years)
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            futures = []
+            for i in range(0, len(station_ids), chunk_size):
+                chunk = station_ids[i:i + chunk_size]
+                futures.append(ex.submit(_sxc_hazard_batch_worker, (chunk, *args_common)))
+            for fut in as_completed(futures):
+                hazard_values.update(fut.result())
 
-        interp = self._interpolate(station_values, station_coords, cfg, algorithm_config)
-        interp['data'] = _normalize_array(interp['data'])
+        hazard_interpolated = self._interpolate(hazard_values, station_coords, cfg, algorithm_config)
 
         out_dir = Path(cfg.get("resultPath") or os.getcwd())
         out_dir.mkdir(parents=True, exist_ok=True)
         inter_dir = out_dir / "intermediate"
         inter_dir.mkdir(parents=True, exist_ok=True)
-        tif_path = str(inter_dir / "全国大豆食心虫综合风险指数.tif")
-        self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)
+        tif_hazard = str(inter_dir / "全国大豆食心虫_危险性指数.tif")
+        self._save_geotiff_gdal(hazard_interpolated['data'].astype(np.float32), hazard_interpolated['meta'], tif_hazard, 0)
 
         class_conf = algorithm_config.get('classification', {})
-        data_out = interp['data']
         if not class_conf:
-            class_conf = {
-                'method': 'custom_thresholds',
-                'thresholds': [
-                    {'min': 0.0, 'max': 0.47, 'level': 4, 'label': '低'},
-                    {'min': 0.47, 'max': 0.59, 'level': 3, 'label': '中'},
-                    {'min': 0.59, 'max': 0.69, 'level': 2, 'label': '较高'},
-                    {'min': 0.69, 'max': 1.01, 'level': 1, 'label': '极高'},
-                ]
-            }
-        method = class_conf.get('method', 'custom_thresholds')
+            class_conf = {'method': 'natural_breaks', 'num_classes': 4}
+        method = class_conf.get('method', 'natural_breaks')
         classifier = self._get_algorithm(f"classification.{method}")
-        data_out = classifier.execute(interp['data'].astype(float), class_conf)
+        data_out = classifier.execute(hazard_interpolated['data'].astype(float), class_conf)
 
-        final_tif = str(out_dir / "全国大豆食心虫_分级.tif")
-        self._save_geotiff_gdal(np.array(data_out).astype(np.float32), interp['meta'], final_tif, 0)
+        final_tif = str(out_dir / "全国大豆食心虫_危险性_分级.tif")
+        self._save_geotiff_gdal(np.array(data_out).astype(np.float32), hazard_interpolated['meta'], final_tif, 0)
         return {
             'data': np.array(data_out),
             'meta': {
-                'width': interp['meta']['width'],
-                'height': interp['meta']['height'],
-                'transform': interp['meta']['transform'],
-                'crs': interp['meta']['crs']
+                'width': hazard_interpolated['meta']['width'],
+                'height': hazard_interpolated['meta']['height'],
+                'transform': hazard_interpolated['meta']['transform'],
+                'crs': hazard_interpolated['meta']['crs']
             }
         }
 
@@ -155,3 +191,15 @@ class SPSO_BC:
         if d == 'SXC':
             return self.calculate_SXC(params)
         raise ValueError(f"不支持的灾害类型: {d}")
+
+
+def _sxc_hazard_batch_worker(args):
+    chunk, input_path, station_path, load_start, load_end, years = args
+    dm = DataManager(input_path, station_path, multiprocess=False, num_processes=1)
+    calc = SPSO_BC()
+    vals = {}
+    for sid in chunk:
+        daily = dm.load_station_data(sid, load_start, load_end)
+        h = calc._compute_hazard_index(daily, years)
+        vals[str(sid)] = float(h) if np.isfinite(h) else np.nan
+    return vals
