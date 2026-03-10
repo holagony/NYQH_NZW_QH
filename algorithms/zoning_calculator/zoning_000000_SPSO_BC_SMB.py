@@ -56,45 +56,7 @@ class SPSO_BC:
             'area_code': config.get("areaCode", "")}
         result = interpolator.execute(data, interpolation_params)
         return result
-
-    def _doc_predictors(self, daily, current_year):
-        if daily is None or len(daily) == 0:
-            return np.nan, np.nan, np.nan
-        tmin = daily["tmin"] if "tmin" in daily.columns else pd.Series(index=daily.index, dtype=float)
-        tavg = daily["tavg"] if "tavg" in daily.columns else pd.Series(index=daily.index, dtype=float)
-        precip = daily["precip"] if "precip" in daily.columns else pd.Series(index=daily.index, dtype=float)
-        x1 = tmin[(tmin.index.year == current_year) & (tmin.index.month == 1)].mean()
-        def _dekad_ranges(year, month):
-            import calendar
-            _, ndays = calendar.monthrange(year, month)
-            return [(1, 10), (11, 20), (21, ndays)]
-        dekads = _dekad_ranges(current_year, 5) + _dekad_ranges(current_year, 6)
-        x2 = 0.0
-        valid = True
-        for d0, d1 in dekads:
-            mask = (tavg.index.year == current_year) & ((tavg.index.month == 5) | (tavg.index.month == 6)) & (tavg.index.day >= d0) & (tavg.index.day <= d1)
-            m = tavg[mask].mean()
-            if pd.isna(m):
-                valid = False
-                break
-            x2 += float(m)
-        if not valid:
-            x2 = np.nan
-        prev_year = int(current_year) - 1
-        x3 = precip[(precip.index.year == prev_year) & (precip.index.month == 9) & (precip.index.day >= 11) & (precip.index.day <= 20)].sum()
-        return x1, x2, x3
-
-    def _classify_rate_level(self, rate):
-        if pd.isna(rate):
-            return None
-        r = float(rate)
-        if r <= 25:
-            return 1
-        if r <= 35:
-            return 2
-        if r <= 45:
-            return 3
-        return 4
+ 
 
     def _compute_hazard_index(self, daily, years):
         weights = {1: 0.055, 2: 0.118, 3: 0.262, 4: 0.565}
