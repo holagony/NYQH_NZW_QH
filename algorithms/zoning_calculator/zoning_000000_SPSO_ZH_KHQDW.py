@@ -73,7 +73,7 @@ class SPSO_ZH:
         start_date = cfg.get('startDate')
         end_date = cfg.get('endDate')
 
-        values: Dict[str, Dict[str, Any]] = {}
+        values: Dict[str, float] = {}
         if station_ids:
             args = [
                 (sid, input_path, station_path, start_date, end_date)
@@ -84,11 +84,8 @@ class SPSO_ZH:
             with Pool(16) as pool:
                 results = pool.map(_spso_zh_worker, args)
                 
-            for sid_str, val, valid_years in results:
-                values[sid_str] = {
-                    'heat_damage': val,
-                    'valid_years': valid_years
-                }
+            for sid_str, val in results:
+                values[sid_str] = val
         return values
 
     def _interpolate(self, station_values: Dict[str, float], station_coords: Dict[str, Any], params: Dict[str, Any]):
@@ -131,7 +128,7 @@ class SPSO_ZH:
         #%% 测试用
         cfg = params.get('config', {})
         result_path = cfg.get('resultPath', '')
-        params_file = Path(result_path) / "intermediate" / "params_SPSO_ZH_KHQGW.json"
+        params_file = Path(result_path) / "intermediate" / "params_SPSO_ZH_KHQDW.json"
         #%%
         if params_file.exists():
             print(f"从文件加载已保存的params: {params_file}")
@@ -146,27 +143,26 @@ class SPSO_ZH:
         station_coords = params.get('station_coords', {})
         algo_cfg = params.get('algorithmConfig', {})
         cfg = params.get('config', {})
-        print("开始计算春大豆高温热害累积量并插值")
+        print("开始计算春大豆低温冷害日数并插值")
         station_values = self._compute_station_values(station_coords, cfg, algo_cfg)
-        print("站点多年平均高温热害累积量统计完成")
+        print("站点多年平均低温冷害日数统计完成")
         try:
             intermediate_dir = Path(cfg["resultPath"]) / "intermediate"
             intermediate_dir.mkdir(parents=True, exist_ok=True)
-            out_csv = intermediate_dir / "intermediate_SPSO_ZH_KHQGW.csv"
-            
+            out_csv = intermediate_dir / "intermediate_SPSO_ZH_KHQDW.csv"
             df_station = pd.DataFrame(
-                [{"Station_Id_C": k, "Heat_Damage": v['heat_damage'], "Time_Length": v['valid_years']} for k, v in station_values.items()]
+                [{"Station_Id_C": k, "Cold_Damage_Days": v} for k, v in station_values.items()]
             )
             df_station.to_csv(out_csv, index=False, encoding="utf-8-sig")
-            print(f"站点高温热害累积量已保存到: {out_csv}")
+            print(f"站点低温冷害日数已保存到: {out_csv}")
         except Exception as e:
             print(f"保存站点CSV失败: {e}")
         
         # 过滤掉无效值后再进行插值
-        valid_station_values = {k: v['heat_damage'] for k, v in station_values.items() if not np.isnan(v['heat_damage'])}
+        valid_station_values = {k: v for k, v in station_values.items() if not np.isnan(v)}
         if not valid_station_values:
             print("警告: 所有站点计算结果均为NaN")
-            raise ValueError("没有有效的站点热害计算结果，无法进行插值")
+            raise ValueError("没有有效的站点冷害计算结果，无法进行插值")
             
         print(f"有效站点数量: {len(valid_station_values)}")
         interp_res = self._interpolate(valid_station_values, station_coords, params)
@@ -183,7 +179,7 @@ class SPSO_ZH:
         #%% 测试用：保存params到文件，供下次运行使用
         try:
             result_path = cfg.get('resultPath', '')
-            params_file = Path(result_path) / "intermediate" / "params_SPSO_ZH_KHQGW.json"
+            params_file = Path(result_path) / "intermediate" / "params_SPSO_ZH_KHQDW.json"
             params_to_save = {
                 'station_coords': station_coords,
                 'algorithmConfig': algo_cfg,
@@ -234,7 +230,7 @@ def _spso_zh_worker(args):
     
     if not province:
         # print(f"站点 {sid_str} 缺少省份信息")
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
     
     # 定义区域省份列表
     north_provinces = ['内蒙古', '黑龙江', '吉林', '辽宁', '河北', '北京', '山东', '山西', '陕西', '甘肃', '河南']
@@ -273,16 +269,16 @@ def _spso_zh_worker(args):
     
     if not start_md:
         # print(f"站点 {sid_str} 省份 {province} 未匹配到南北方区域")
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
 
     # 加载站点数据
     daily = dm.load_station_data(sid_str, start_date_global, end_date_global)
     if len(daily) == 0:
         # print(f"站点 {sid_str} 无气象数据")
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
 
     years = daily.index.year.unique()
-    total_heat_damage = 0
+    total_cold_damage_days = 0
     valid_years = 0
     
     for year in years:
@@ -296,56 +292,26 @@ def _spso_zh_worker(args):
             if len(sub_df) == 0:
                 continue
                 
-            if 'tavg' not in sub_df.columns or 'tmax' not in sub_df.columns:
+            if 'tavg' not in sub_df.columns:
                 continue
                 
             tavg = sub_df['tavg']
-            tmax = sub_df['tmax']
             
-            # 识别高温过程：连续3天及以上 Tavg>=30 且 Tmax>=35
-            cond = ((tavg >= 30) & (tmax >= 35)).values
-            n = len(cond)
-            current_run = []
-            year_heat_damage = 0
+            # 识别低温日数：日平均气温 < 20℃
+            cond = (tavg < 20).values
             
-            for i in range(n):
-                if cond[i]:
-                    current_run.append(i)
-                else:
-                    if len(current_run) >= 3:
-                        # 计算该高温过程的日平均气温的平均值 和 日最高气温的平均值
-                        run_tavg = tavg.iloc[current_run].mean()
-                        run_tmax = tmax.iloc[current_run].max()
-                        
-                        # 计算该过程的热害累积量 Hi = (Ti - 30) + (Tmax,i - 35)
-                        # Ti: 该过程的日平均温度 (run_tavg)
-                        # Tmax,i: 该过程的日最高温度 (run_tmax)
-                        # Tc=30, Tmax,c=35
-                        hi = (run_tavg - 30) + (run_tmax - 35)
-                        
-                        # 只有当计算出的 Hi > 0 时才累加（理论上满足筛选条件通常会大于0，但加上保险）
-                        if hi > 0:
-                            year_heat_damage += hi
-                    current_run = []
+            # 统计低温日数
+            year_cold_damage_days = np.sum(cond)
             
-            # 处理结尾的run
-            if len(current_run) >= 3:
-                run_tavg = tavg.iloc[current_run].mean()
-                run_tmax = tmax.iloc[current_run].mean()
-                hi = (run_tavg - 30) + (run_tmax - 35)
-                if hi > 0:
-                    year_heat_damage += hi
-            
-            total_heat_damage += year_heat_damage
+            total_cold_damage_days += year_cold_damage_days
             valid_years += 1
             
         except Exception:
             continue
         
     if valid_years == 0:
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
         
-    avg_heat_damage = total_heat_damage# / valid_years
+    avg_cold_damage_days = total_cold_damage_days / valid_years
     
-    # 确保返回的是 float 类型，且不是 np.nan (如果 valid_years > 0)
-    return sid_str, float(avg_heat_damage), valid_years
+    return sid_str, float(avg_cold_damage_days)

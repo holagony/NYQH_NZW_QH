@@ -166,6 +166,11 @@ class WIWH_ZH:
         interpolation = algorithmConfig.get("interpolation", {})
         interpolation_method = interpolation.get('method', 'lsm_idw')
         interpolation_params = interpolation.get('params', {})
+        interpolation_params['min_value'] = 0
+        interpolation_params['radius_dist'] = 10
+        interpolation_params['min_num'] = 5
+        interpolation_params['first_size'] = 100
+
         interpolator = self._get_algorithm(f"interpolation.{interpolation_method}")
         # 组织插值所需输入，包含站点值/坐标、DEM/行政区/规则格网等路径
         grid_path = config.get("gridFilePath", "")

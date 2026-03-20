@@ -20,5 +20,6 @@
   "resultJsonPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/zoning_000000_WIWH_BC_YC/resultJsonFile.json",
   "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/zoning_000000_WIWH_BC_YC/resultFlowFile.json",
   "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/NYQH_wmj/zoning_000000_WIWH_BC_YC",
+  "maskFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/NYQH_NZW_QH/test/全国冬小麦种植范围1991-2020.tif",
   "algorithmConfig": {}
 }

@@ -108,6 +108,11 @@ class WIWH_ZH:
         interpolation = algorithmConfig.get("interpolation", {})
         interpolation_method = interpolation.get('method', 'lsm_idw')
         interpolation_params = interpolation.get('params', {})
+        interpolation_params['min_value'] = 0
+        interpolation_params['radius_dist'] = 10
+        interpolation_params['min_num'] = 5
+        interpolation_params['first_size'] = 100
+
         interpolator = self._get_algorithm(f"interpolation.{interpolation_method}")
         data = {
             'station_values': station_values,

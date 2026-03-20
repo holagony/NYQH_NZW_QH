@@ -9,7 +9,7 @@ from algorithms.data_manager import DataManager
 from osgeo import gdal
 
 
-class SPSO_ZH:
+class SUSO_ZH:
     def __init__(self):
         pass
 
@@ -73,7 +73,7 @@ class SPSO_ZH:
         start_date = cfg.get('startDate')
         end_date = cfg.get('endDate')
 
-        values: Dict[str, Dict[str, Any]] = {}
+        values: Dict[str, float] = {}
         if station_ids:
             args = [
                 (sid, input_path, station_path, start_date, end_date)
@@ -84,11 +84,8 @@ class SPSO_ZH:
             with Pool(16) as pool:
                 results = pool.map(_spso_zh_worker, args)
                 
-            for sid_str, val, valid_years in results:
-                values[sid_str] = {
-                    'heat_damage': val,
-                    'valid_years': valid_years
-                }
+            for sid_str, val in results:
+                values[sid_str] = val
         return values
 
     def _interpolate(self, station_values: Dict[str, float], station_coords: Dict[str, Any], params: Dict[str, Any]):
@@ -153,9 +150,8 @@ class SPSO_ZH:
             intermediate_dir = Path(cfg["resultPath"]) / "intermediate"
             intermediate_dir.mkdir(parents=True, exist_ok=True)
             out_csv = intermediate_dir / "intermediate_SPSO_ZH_KHQGW.csv"
-            
             df_station = pd.DataFrame(
-                [{"Station_Id_C": k, "Heat_Damage": v['heat_damage'], "Time_Length": v['valid_years']} for k, v in station_values.items()]
+                [{"Station_Id_C": k, "Heat_Damage": v} for k, v in station_values.items()]
             )
             df_station.to_csv(out_csv, index=False, encoding="utf-8-sig")
             print(f"站点高温热害累积量已保存到: {out_csv}")
@@ -163,7 +159,7 @@ class SPSO_ZH:
             print(f"保存站点CSV失败: {e}")
         
         # 过滤掉无效值后再进行插值
-        valid_station_values = {k: v['heat_damage'] for k, v in station_values.items() if not np.isnan(v['heat_damage'])}
+        valid_station_values = {k: v for k, v in station_values.items() if not np.isnan(v)}
         if not valid_station_values:
             print("警告: 所有站点计算结果均为NaN")
             raise ValueError("没有有效的站点热害计算结果，无法进行插值")
@@ -234,7 +230,7 @@ def _spso_zh_worker(args):
     
     if not province:
         # print(f"站点 {sid_str} 缺少省份信息")
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
     
     # 定义区域省份列表
     north_provinces = ['内蒙古', '黑龙江', '吉林', '辽宁', '河北', '北京', '山东', '山西', '陕西', '甘肃', '河南']
@@ -261,25 +257,25 @@ def _spso_zh_worker(args):
         province_clean = province.strip().replace('省', '').replace('市', '').replace('自治区', '')
         for p in north_provinces:
             if p in province_clean:
-                start_md, end_md = '07-01', '07-20'
+                start_md, end_md = '08-01', '08-20'
                 found = True
                 break
         if not found:
             for p in south_provinces:
                 if p in province_clean:
-                    start_md, end_md = '06-01', '06-30'
+                    start_md, end_md = '07-01', '07-30'
                     found = True
                     break
     
     if not start_md:
         # print(f"站点 {sid_str} 省份 {province} 未匹配到南北方区域")
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
 
     # 加载站点数据
     daily = dm.load_station_data(sid_str, start_date_global, end_date_global)
     if len(daily) == 0:
         # print(f"站点 {sid_str} 无气象数据")
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
 
     years = daily.index.year.unique()
     total_heat_damage = 0
@@ -343,9 +339,9 @@ def _spso_zh_worker(args):
             continue
         
     if valid_years == 0:
-        return sid_str, np.nan, 0
+        return sid_str, np.nan
         
     avg_heat_damage = total_heat_damage# / valid_years
     
     # 确保返回的是 float 类型，且不是 np.nan (如果 valid_years > 0)
-    return sid_str, float(avg_heat_damage), valid_years
+    return sid_str, float(avg_heat_damage)

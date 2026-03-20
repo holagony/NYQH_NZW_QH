@@ -224,6 +224,11 @@ class WIWH_BC:
             print(f"保存站点CMB适宜日数CSV失败: {e}")
         interp_res = self._interpolate(station_values, station_coords, params)
         print("IDW插值完成")
+        mask_path = cfg.get('maskFilePath')
+        mask_arr = _mask_to_target_grid(mask_path, interp_res['meta'])
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(interp_res['data'], 0.0), np.nan)
+        interp_res['data'] = interp_data_masked
+        print('数据掩膜完成')
         final_res = self._maybe_classify(interp_res, params)
         return {
             'data': final_res['data'],
@@ -254,6 +259,15 @@ def _get_dm(input_path: str, station_path: str) -> DataManager:
         _dm_cache[key] = dm
     return dm
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
 
 def _cmb_worker(args):
     sid, input_path, station_path, start_date, end_date, pheno_by_station = args
