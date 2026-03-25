@@ -19,5 +19,6 @@
   "resultFlowPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/610000_APPL_ZH_GSPDQGWGH/resultFlowFile.json",
   "resultPath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/output/20251229/610000_APPL_ZH_GSPDQGWGH",
   "dependDir": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
+  "maskFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend/dem/610000_APPL_mask.tif",
   "algorithmConfig": {}
 }

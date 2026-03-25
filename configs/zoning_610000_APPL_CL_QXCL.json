@@ -1,0 +1,100 @@
+{
+    "indicators": {
+        "Ts": {
+            "type": "stable_threshold_accumulation",
+            "base_temp": 10,
+            "variable": "tavg",
+            "description": "稳定通过10℃的有效积温"
+        },
+        "R6_8": {
+            "type": "period_sum",
+            "start_date": "06-01",
+            "end_date": "08-31",
+            "variable": "precip",
+            "description": "6-8月累计降水量"
+        },
+        "R5": {
+            "type": "period_sum",
+            "start_date": "05-01",
+            "end_date": "05-31",
+            "variable": "precip",
+            "description": "5月累计降水量"
+        },
+        "T4": {
+            "type": "period_mean",
+            "start_date": "04-01",
+            "end_date": "04-30",
+            "variable": "tavg",
+            "description": "4月平均气温"
+        }
+    },
+    "grading": {
+        "Ts": {
+            "thresholds": [
+                {"max": 3000, "value": 1},
+                {"min": 3000, "max": 3300, "value": 2},
+                {"min": 3300, "max": 3600, "value": 3},
+                {"min": 3600, "max": 4400, "value": 4},
+                {"min": 4400, "value": 3}
+            ]
+        },
+        "R6_8": {
+            "thresholds": [
+                {"max": 252, "value": 1},
+                {"min": 252, "max": 290, "value": 3},
+                {"min": 290, "max": 320, "value": 4},
+                {"min": 320, "max": 410, "value": 2},
+                {"min": 410, "value": 1}
+            ]
+        },
+        "R5": {
+            "thresholds": [
+                {"max": 34, "value": 1},
+                {"min": 34, "max": 40, "value": 2},
+                {"min": 40, "max": 50, "value": 3},
+                {"min": 50, "max": 60, "value": 4},
+                {"min": 60, "max": 80, "value": 2},
+                {"min": 80, "value": 1}
+            ]
+        },
+        "T4": {
+            "thresholds": [
+                {"max": 11, "value": 1},
+                {"min": 11, "max": 12, "value": 3},
+                {"min": 12, "max": 14, "value": 4},
+                {"min": 14, "max": 15, "value": 2},
+                {"min": 15, "value": 1}
+            ]
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "0.2 * Ts + 0.2 * R6_8 + 0.4 * R5 + 0.2 * T4",
+        "variables": {
+            "Ts": {"ref": "Ts"},
+            "R6_8": {"ref": "R6_8"},
+            "R5": {"ref": "R5"},
+            "T4": {"ref": "T4"}
+        },
+        "description": "苹果产量综合评价指数计算公式为：Pc = 0.2 * Ts + 0.2 * R6_8 + 0.4 * R5 + 0.2 * T4，其中Ts为稳定通过10℃的有效积温分级赋值、R6_8为6-8月累计降水量分级赋值、R5为5月累计降水量分级赋值、T4为4月平均气温分级赋值。"
+    },
+    "interpolation": {
+        "method": "lsm_idw",
+        "order": "before",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "thresholds": [
+            {"level": 4, "label": "低产区", "max": 2.2},
+            {"level": 3, "label": "中产区", "min": 2.2, "max": 2.7},
+            {"level": 2, "label": "中高产区", "min": 2.7, "max": 3.2},
+            {"level": 1, "label": "高产区", "min": 3.2}
+        ]
+    }
+}

@@ -1,0 +1,85 @@
+{
+    "indicators": {
+        "S4": {
+            "type": "period_sum",
+            "start_date": "04-01",
+            "end_date": "04-30",
+            "variable": "sunshine",
+            "description": "4月日照时数"
+        },
+        "RH9_10": {
+            "type": "period_mean",
+            "start_date": "09-01",
+            "end_date": "10-31",
+            "variable": "rhum",
+            "description": "9-10月平均相对湿度"
+        },
+        "T9_10": {
+            "type": "period_mean",
+            "start_date": "09-01",
+            "end_date": "10-31",
+            "variable": "tmin",
+            "description": "9-10月平均最低气温"
+        }
+    },
+    "grading": {
+        "S4": {
+            "thresholds": [
+                {"max": 200, "value": 1},
+                {"min": 200, "max": 215, "value": 2},
+                {"min": 215, "max": 230, "value": 3},
+                {"min": 230, "max": 240, "value": 4},
+                {"min": 240, "value": 3}
+            ]
+        },
+        "RH9_10": {
+            "thresholds": [
+                {"max": 70, "value": 1},
+                {"min": 70, "max": 73, "value": 3},
+                {"min": 73, "max": 76, "value": 4},
+                {"min": 76, "max": 80, "value": 2},
+                {"min": 80, "value": 1}
+            ]
+        },
+        "T9_10": {
+            "thresholds": [
+                {"max": 6, "value": 1},
+                {"min": 6, "max": 7, "value": 2},
+                {"min": 7, "max": 8, "value": 3},
+                {"min": 8, "max": 9, "value": 4},
+                {"min": 9, "max": 11, "value": 3},
+                {"min": 11, "max": 12, "value": 2},
+                {"min": 12, "value": 1}
+            ]
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "0.4 * T9_10 + 0.3 * S4 + 0.3 * RH9_10",
+        "variables": {
+            "T9_10": {"ref": "T9_10"},
+            "S4": {"ref": "S4"},
+            "RH9_10": {"ref": "RH9_10"}
+        },
+        "description": "苹果品质综合评价指数计算公式为：Icq = 0.4 * T9_10 + 0.3 * S4 + 0.3 * RH9_10，其中T9_10为9-10月平均最低气温分级赋值，S4为4月日照时数分级赋值，RH9_10为9-10月平均相对湿度分级赋值"
+    },
+    "interpolation": {
+        "method": "lsm_idw",
+        "order": "before",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "thresholds": [
+            {"level": 4, "label": "一般", "max": 2.1},
+            {"level": 3, "label": "良", "min": 2.1, "max": 2.6},
+            {"level": 2, "label": "优", "min": 2.6, "max": 3.1},
+            {"level": 1, "label": "特优", "min": 3.1}
+        ]
+    }
+}

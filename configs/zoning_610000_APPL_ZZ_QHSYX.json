@@ -1,0 +1,117 @@
+{
+    "indicators": {
+        "X1": {
+            "type": "period_mean",
+            "start_date": "01-01",
+            "end_date": "12-31",
+            "variable": "tavg",
+            "description": "年平均气温"
+        },
+        "X2": {
+            "type": "period_sum",
+            "start_date": "01-01",
+            "end_date": "12-31",
+            "variable": "precip",
+            "description": "年累积降水量"
+        },
+        "X3": {
+            "type": "period_mean",
+            "start_date": "06-01",
+            "end_date": "08-31",
+            "variable": "rhum",
+            "description": "6-8月平均相对湿度"
+        },
+        "X4": {
+            "type": "period_mean",
+            "start_date": "06-01",
+            "end_date": "08-31",
+            "variable": "tmin",
+            "description": "6-8月平均最低气温"
+        },
+        "X5": {
+            "type": "period_mean",
+            "start_date": "01-01",
+            "end_date": "01-31",
+            "variable": "tavg",
+            "description": "1月平均气温"
+        }
+    },
+    "suitability_functions": {
+        "X1": {
+            "description": "年平均气温适宜度分段函数",
+            "segments": [
+                {"condition": "x<=2.9", "formula": "0"},
+                {"condition": "2.9<x<=9.5", "formula": "(x-2.9)/6.6"},
+                {"condition": "9.5<x<=11.5", "formula": "1"},
+                {"condition": "11.5<x<=16.8", "formula": "(17.3-x)/5.8"}
+            ]
+        },
+        "X2": {
+            "description": "年累积降水量适宜度分段函数",
+            "segments": [
+                {"condition": "337<x<=600", "formula": "(x-180)/420"},
+                {"condition": "600<x<=750", "formula": "1"},
+                {"condition": "750<x<=1000", "formula": "(1000-x)/250"},
+                {"condition": "x>1000", "formula": "0"}
+            ]
+        },
+        "X3": {
+            "description": "6-8月平均相对湿度适宜度分段函数",
+            "segments": [
+                {"condition": "54.4<x<=64", "formula": "(x-54.4)/9.6"},
+                {"condition": "64<x<=67", "formula": "1"},
+                {"condition": "67<x<=80", "formula": "(85-x)/13.0"},
+                {"condition": "x>80", "formula": "0"}
+            ]
+        },
+        "X4": {
+            "description": "6-8月平均最低气温适宜度分段函数",
+            "segments": [
+                {"condition": "x<=8.0", "formula": "0"},
+                {"condition": "8.0<x<=14.0", "formula": "(x-8.0)/6.0"},
+                {"condition": "14.0<x<=17.0", "formula": "1"},
+                {"condition": "17.0<x<=23.0", "formula": "(28.5-x)/11.5"}
+            ]
+        },
+        "X5": {
+            "description": "1月平均气温适宜度分段函数",
+            "segments": [
+                {"condition": "-10.5<x<=-6.0", "formula": "(x+12.3)/6.3"},
+                {"condition": "-6.0<x<=-1.0", "formula": "1"},
+                {"condition": "-1.0<x<=4.0", "formula": "(4.0-x)/5.0"},
+                {"condition": "x>4.0", "formula": "0"}
+            ]
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "0.294 * X1 + 0.208 * X2 + 0.206 * X3 + 0.129 * X4 + 0.163 * X5",
+        "variables": {
+            "X1": {"ref": "X1"},
+            "X2": {"ref": "X2"},
+            "X3": {"ref": "X3"},
+            "X4": {"ref": "X4"},
+            "X5": {"ref": "X5"}
+        },
+        "description": "苹果种植气候适宜性综合评价指数计算公式为：Pc = 0.294 * X1 + 0.208 * X2 + 0.206 * X3 + 0.129 * X4 + 0.163 * X5，其中X1为年平均气温适宜度，X2为年累积降水量适宜度，X3为6-8月平均相对湿度适宜度，X4为6-8月平均最低气温适宜度，X5为1月平均气温适宜度"
+    },
+    "interpolation": {
+        "method": "lsm_idw",
+        "order": "before",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "thresholds": [
+            {"level": 4, "label": "不适宜区", "max": 0.704},
+            {"level": 3, "label": "次适宜区", "min": 0.704, "max": 0.780},
+            {"level": 2, "label": "适宜区", "min": 0.780, "max": 0.883},
+            {"level": 1, "label": "最适宜区", "min": 0.883}
+        ]
+    }
+}

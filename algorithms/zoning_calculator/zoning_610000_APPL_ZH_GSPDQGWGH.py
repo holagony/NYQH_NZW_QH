@@ -5,6 +5,15 @@ from pathlib import Path
 from osgeo import gdal
 from algorithms.data_manager import DataManager
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
 
 def _normalize_array(array):
     """栅格归一化到 [0,1]，保留 NaN；常数场归一化为 0.5"""
@@ -230,6 +239,14 @@ class APPL_ZH:
         # 插值与栅格归一化
         interp = self._interpolate(station_values, station_coords, cfg, algorithm_config)
         interp['data'] = _normalize_array(interp['data'])
+
+        # 增加掩膜数据
+        mask_path = cfg.get('maskFilePath')
+        mask_arr = _mask_to_target_grid(mask_path, interp['meta'])
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(interp['data'], 0.0), np.nan)
+        interp['data'] = interp_data_masked
+        print('数据掩膜完成')
+
         # 输出路径与中间产品
         out_dir = Path(cfg.get("resultPath") or os.getcwd())
         out_dir.mkdir(parents=True, exist_ok=True)

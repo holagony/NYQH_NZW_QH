@@ -1,0 +1,113 @@
+{
+    "indicators": {
+        "D8_9": {
+            "type": "conditional_count",
+            "start_date": "08-01",
+            "end_date": "09-30",
+            "conditions": [{"variable": "precip", "operator": ">", "value": 0.1}],
+            "description": "8-9月降水日数"
+        },
+        "R4_6": {
+            "type": "period_sum",
+            "start_date": "04-01",
+            "end_date": "06-30",
+            "variable": "precip",
+            "description": "4-6月累计降水量"
+        },
+        "W4_9": {
+            "type": "period_mean",
+            "start_date": "04-01",
+            "end_date": "09-30",
+            "variable": "rhum",
+            "description": "4-9月平均相对湿度"
+        },
+        "T4_6": {
+            "type": "period_mean",
+            "start_date": "04-01",
+            "end_date": "06-30",
+            "variable": "tavg",
+            "description": "4-6月平均气温"
+        },
+        "D4_6": {
+            "type": "conditional_count",
+            "start_date": "04-01",
+            "end_date": "06-30",
+            "conditions": [{"variable": "precip", "operator": ">", "value": 0.1}],
+            "description": "4-6月降水日数"
+        }
+    },
+    "grading": {
+        "D8_9": {
+            "thresholds": [
+                {"min": 18.5, "max": 22.0, "value": 1},
+                {"min": 22.0, "max": 25.0, "value": 2},
+                {"min": 25.0, "max": 28.0, "value": 3},
+                {"min": 28.0, "value": 4}
+            ]
+        },
+        "R4_6": {
+            "thresholds": [
+                {"min": 71.0, "max": 132.0, "value": 1},
+                {"min": 132.0, "max": 200.0, "value": 2},
+                {"min": 200.0, "max": 290.0, "value": 3},
+                {"min": 290.0, "value": 4}
+            ]
+        },
+        "W4_9": {
+            "thresholds": [
+                {"min": 48.3, "max": 56.1, "value": 1},
+                {"min": 56.1, "max": 65.0, "value": 2},
+                {"min": 65.0, "max": 74.0, "value": 3},
+                {"min": 74.0, "max": 83.3, "value": 4}
+            ]
+        },
+        "T4_6": {
+            "thresholds": [
+                {"min": 1.7, "max": 12.5, "value": 1},
+                {"min": 12.5, "max": 15.5, "value": 2},
+                {"min": 15.5, "max": 17.0, "value": 3},
+                {"min": 17.0, "max": 18.5, "value": 4},
+                {"min": 18.5, "value": 1}
+            ]
+        },
+        "D4_6": {
+            "thresholds": [
+                {"min": 17.5, "max": 24.0, "value": 1},
+                {"min": 24.0, "max": 30.0, "value": 2},
+                {"min": 30.0, "max": 36.0, "value": 3},
+                {"min": 36.0, "value": 4}
+            ]
+        }
+    },
+    "formula": {
+        "type": "custom_formula",
+        "formula": "0.18 * D4_6 + 0.3 * R4_6 + 0.38 * W4_9 + 0.1 * D8_9 + 0.04 * T4_6",
+        "variables": {
+            "D4_6": {"ref": "D4_6"},
+            "R4_6": {"ref": "R4_6"},
+            "W4_9": {"ref": "W4_9"},
+            "D8_9": {"ref": "D8_9"},
+            "T4_6": {"ref": "T4_6"}
+        },
+        "description": "苹果褐斑病综合评价指数计算公式为：Hm = 0.18 * D4_6 + 0.3 * R4_6 + 0.38 * W4_9 + 0.1 * D8_9 + 0.04 * T4_6，其中D4_6为4-6月降水日数分级赋值，R4_6为4-6月累计降水量分级赋值，W4_9为4-9月平均相对湿度分级赋值，D8_9为8-9月降水日数分级赋值，T4_6为4-6月平均气温分级赋值"
+    },
+    "interpolation": {
+        "method": "lsm_idw",
+        "order": "before",
+        "params": {
+            "radius_dist": 5.0,
+            "min_num": 10,
+            "first_size": 100,
+            "var_name": "suitability"
+        }
+    },
+    "classification": {
+        "method": "custom_thresholds",
+        "thresholds": [
+            {"level": 4, "label": "低风险","min":"","max": 1.880},
+            {"level": 3, "label": "中风险", "min": 1.880, "max": 2.839},
+            {"level": 2, "label": "高风险", "min": 2.839, "max": 3.675},
+            {"level": 1, "label": "极高风险", "min": 3.675,"max":""}
+        ]
+    }
+}
