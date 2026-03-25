@@ -6,7 +6,17 @@ from algorithms.data_manager import DataManager
 from algorithms.interpolation.idw import IDWInterpolation
 from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
 from osgeo import gdal
+from pathlib import Path
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
 
 class APPL_ZH:
     def __init__(self):
@@ -144,7 +154,6 @@ class APPL_ZH:
             'min_value': min_value,
             'max_value': max_value
         }
-        from pathlib import Path
         intermediate_dir = Path(config["resultPath"]) / "intermediate"
         intermediate_dir.mkdir(parents=True, exist_ok=True)
         output_path = intermediate_dir / "intermediate_HQDH_risk.tif"
@@ -181,6 +190,14 @@ class APPL_ZH:
 
         print("第二步，根据花期冻害指数插值栅格化指数")
         YDDH_index_raster = self._perform_interpolation_for_indicator(station_values, station_coords, params, "HQDH_risk")
+        
+        # 增加掩膜数据
+        mask_path = cfg.get('maskFilePath')
+        mask_arr = _mask_to_target_grid(mask_path, YDDH_index_raster['meta'])
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(YDDH_index_raster['data'], 0.0), np.nan)
+        YDDH_index_raster['data'] = interp_data_masked
+        print('数据掩膜完成')
+
         print("第三步，基于插值栅格化指数进行区划分级")
         final_result = self._perform_classification(YDDH_index_raster, params)
         return {

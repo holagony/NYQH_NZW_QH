@@ -8,6 +8,16 @@ from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
 from osgeo import gdal
 
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
+
 class APPL_ZH:
     def __init__(self):
         self.WEIGHTS = {
@@ -167,6 +177,14 @@ class APPL_ZH:
         station_values = {sid: float(val) if np.isfinite(val) else np.nan for sid, val in LYY_index.items()}
         print("第二步，根据风险指数插值栅格化")
         LYY_raster = self._perform_interpolation_for_indicator(station_values, station_coords, params, "LYY_risk")
+
+        # 增加掩膜数据
+        mask_path = cfg.get('maskFilePath')
+        mask_arr = _mask_to_target_grid(mask_path, LYY_raster['meta'])
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(LYY_raster['data'], 0.0), np.nan)
+        LYY_raster['data'] = interp_data_masked
+        print('数据掩膜完成')
+
         print("第三步，基于栅格指数进行自然断点分级")
         final_result = self._perform_classification(LYY_raster, params)
         return {

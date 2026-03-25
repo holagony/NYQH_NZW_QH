@@ -7,6 +7,15 @@ from pathlib import Path
 from osgeo import gdal
 from algorithms.data_manager import DataManager
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
 
 def _normalize_array(array):
     if array.size == 0:
@@ -169,6 +178,14 @@ class APPL_ZH:
         interp = self._interpolate(station_values, station_coords, cfg, algorithm_config)
         # 插值结果归一化
         interp['data'] = _normalize_array(interp['data'])
+
+        # 增加掩膜数据
+        mask_path = cfg.get('maskFilePath')
+        mask_arr = _mask_to_target_grid(mask_path, interp['meta'])
+        interp_data_masked = np.where(mask_arr == 1, np.maximum(interp['data'], 0.0), np.nan)
+        interp['data'] = interp_data_masked
+        print('数据掩膜完成')
+
         # 输出路径准备
         out_dir = Path(cfg.get("resultPath") or os.getcwd())
         out_dir.mkdir(parents=True, exist_ok=True)
