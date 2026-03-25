@@ -216,6 +216,9 @@ class SPSO_ZH:
 
     def calculate_cwdi(self, daily_data, weights, lat_deg=None, elev_m=None):
         df = daily_data.copy()
+        if df.empty:
+            df["CWDI"] = pd.Series(index=df.index, dtype=float)
+            return df
         if 'P' not in df.columns and 'precip' in df.columns:
             df = df.rename(columns={'precip': 'P'})
 
