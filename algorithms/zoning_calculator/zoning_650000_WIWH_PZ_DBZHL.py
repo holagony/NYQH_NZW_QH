@@ -6,6 +6,17 @@ from typing import Dict, Any, Union, List
 from osgeo import gdal
 
 
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
+
+
 class WIWH_PZ:
     """通用区划计算器 - 支持完全参数化配置"""
 
@@ -31,8 +42,15 @@ class WIWH_PZ:
 
         print(f'开始计算{config.get("cropCode", "")}-{config.get("zoningType", "")}-{config.get("element", "")}-流程')
 
-        # 统一的计算流程
+        # 统一的计算流程：先插值并计算综合指标
         result = self._calculate_with_interpolation(station_indicators, station_coords, config, algorithmConfig)
+
+        mask_path = config.get("maskFilePath")
+        if mask_path:
+            mask_arr = _mask_to_target_grid(mask_path, result['meta'])
+            result['data'] = np.where(mask_arr == 1, np.maximum(result['data'], 0.0), np.nan)
+        else:
+            result['data'] = np.maximum(result['data'], 0.0)
 
         # 保存分级前的综合指标
         composite_index_result = {
@@ -41,7 +59,7 @@ class WIWH_PZ:
         }
         self._save_composite_index(composite_index_result, config, "composite_index")
 
-        # 分级
+        # 分级（针对掩膜后的综合指标）
         classification = algorithmConfig['classification']
         classification_method = classification.get('method', 'natural_breaks')
         classifier = self._get_algorithm(f"classification.{classification_method}")

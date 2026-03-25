@@ -10,6 +10,18 @@ import json
 import datetime
 
 
+def _mask_to_target_grid(mask_path, meta):
+    from osgeo import gdal
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
+
+
 class WIWH_ZH:
     """
     新疆冬小麦干热风区划主类
@@ -171,7 +183,17 @@ class WIWH_ZH:
             print('第二步，根据干热风强度指数R，插值栅格化指数')
             GRF_index_raster = self._perform_interpolation_for_indicator(GRF_index, station_coords, params, "GRF_risk")
 
-            print('第三步，基于插值栅格化指数进行区划分级')
+            config = params['config']
+            mask_path = config.get("maskFilePath")
+            data = GRF_index_raster['data']
+            if mask_path:
+                mask_arr = _mask_to_target_grid(mask_path, GRF_index_raster['meta'])
+                data = np.where(mask_arr == 1, np.maximum(data, 0.0), np.nan)
+            else:
+                data = np.maximum(data, 0.0)
+            GRF_index_raster['data'] = data
+
+            print('第三步，基于掩膜后的插值栅格化指数进行区划分级')
             final_result = self._perform_classification(GRF_index_raster, params)
             
             print(f'计算{params["config"].get("cropCode","")}-{params["config"].get("zoningType","")}-{params["config"].get("element","")}-区划完成')

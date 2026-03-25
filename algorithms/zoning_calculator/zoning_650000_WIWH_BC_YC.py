@@ -15,6 +15,17 @@ import pandas as pd
 import numpy as np
 import time
 
+
+def _mask_to_target_grid(mask_path, meta):
+    src = gdal.Open(mask_path)
+    drv = gdal.GetDriverByName('MEM')
+    dst = drv.Create('', meta['width'], meta['height'], 1, gdal.GDT_Byte)
+    dst.SetGeoTransform(meta['transform'])
+    dst.SetProjection(meta['crs'])
+    gdal.Warp(dst, src, resampleAlg=gdal.GRA_NearestNeighbour)
+    arr = dst.GetRasterBand(1).ReadAsArray()
+    return arr
+
 def count_comfortable_days_YC(daily_data,start_date,end_date):
     """
     计算日平均温度为15～25℃且日平均相对湿度60%～70％的平均日数
@@ -173,8 +184,17 @@ class WIWH_BC:
             result = LSMIDWInterpolation().execute(interp_data, algorithm_config.get("interpolation")['params'])
         else:
             result = IDWInterpolation().execute(interp_data, algorithm_config.get("interpolation")['params'])
+
+        mask_path = cfg.get("maskFilePath")
+        data = result["data"]
+        if mask_path:
+            mask_arr = _mask_to_target_grid(mask_path, result['meta'])
+            data = np.where(mask_arr == 1, np.maximum(data, 0.0), np.nan)
+        else:
+            data = np.maximum(data, 0.0)
+
         #归一化-----------------------------------------------------------------------
-        result_norm=normalize_array(result["data"])
+        result_norm = normalize_array(data)
         result_path = cfg.get("resultPath")
         intermediate_dir = os.path.join(result_path, "intermediate")
         os.makedirs(intermediate_dir, exist_ok=True)
