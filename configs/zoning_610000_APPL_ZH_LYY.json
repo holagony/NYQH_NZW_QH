@@ -28,6 +28,6 @@
   },
   "classification": {
     "method": "natural_breaks",
-    "num_classes": 4
+    "num_classes": 3
   }
 }

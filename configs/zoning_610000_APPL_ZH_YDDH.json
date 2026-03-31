@@ -43,7 +43,7 @@
   },
   "classification": {
     "method": "natural_breaks",
-    "num_classes": 4
+    "num_classes": 3
   },
   "threshold_des": [
     { "name_id": "level", "name": "序号" },
