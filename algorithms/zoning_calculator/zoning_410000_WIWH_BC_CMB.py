@@ -42,7 +42,7 @@ class WIWH_BC:
         print(f'开始计算{config.get("cropCode","")}-{config.get("zoningType","")}-{config.get("element","")}-新流程')
 
         result = self._calculate_with_interpolation_before(station_indicators, station_coords, config, algorithmConfig)
-
+        print(result)
         # 保存分级前的综合指标
         composite_index_result = {
             'data': result['data'].copy(),
@@ -401,6 +401,12 @@ class WIWH_BC:
         # 计算公式
         try:
             # 替换公式中的变量名
+            for var_name, var_value in station_data.items():
+                if isinstance(var_value, (int, float)) and not np.isnan(var_value):
+                    print(f"  {var_name}: {var_value:.4f}")
+                else:
+                    print(f"  {var_name}: NaN 或无效值")
+                    
             local_formula = formula_str
             for var_name, var_value in station_data.items():
                 if isinstance(var_value, (int, float)) and not np.isnan(var_value):

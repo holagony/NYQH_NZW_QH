@@ -69,7 +69,7 @@
     },
     "interpolation": {
         "order": "after",
-        "method": "lsm_idw"
+        "method": "idw"
     },
     "classification": {
         "method": "natural_breaks",

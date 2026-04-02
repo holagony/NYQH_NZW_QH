@@ -54,6 +54,21 @@ class WIWH_PZ:
         data = classifier.execute(result['data'], classification)
         result['data'] = data
 
+        config = params['config']
+        pest_type = config['element']
+        if pest_type in ['ZLRZ']:
+            # 分级翻转：将分级结果反转（如1→5，2→4，3→3，4→2，5→1）
+            reverse = classification.get('reverse', False)
+            if reverse:
+                unique_values = np.unique(data[data > 0])
+                if len(unique_values) > 1:
+                    max_val = unique_values.max()
+                    min_val = unique_values.min()
+                    mask = data > 0
+                    data[mask] = max_val + min_val - data[mask]
+            result['data'] = data
+            
+
         print(f'计算{config.get("cropCode","")}-{config.get("zoningType","")}-{config.get("element","")}-区划完成')
 
         return result
@@ -359,7 +374,6 @@ class WIWH_PZ:
 
             # 替换公式中的变量名
             local_formula = formula_str
-            local_formula = local_formula.replace('-', '+')
             for var_name, var_value in station_data.items():
                 if isinstance(var_value, (int, float)) and not np.isnan(var_value):
                     print(f"  {var_name}: {var_value:.4f}")
@@ -504,7 +518,6 @@ class WIWH_PZ:
             local_env.update(var_mapping)
 
             # 执行公式计算
-            formula_str = formula_str.replace('-', '+')
             result = eval(formula_str, {"__builtins__": {}}, local_env)
             return result
 
