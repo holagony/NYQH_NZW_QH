@@ -1,0 +1,38 @@
+{
+  "indicators": {},
+  "interpolation": {
+    "method": "lsm_idw",
+    "params": {
+      "radius_dist": 10,
+      "first_size": 100
+    }
+  },
+  "classification": {
+    "method": "custom_thresholds",
+    "num_classes": 4,
+    "thresholds": [
+      {
+        "level": 4,
+        "label": "一般",
+        "max": 19
+      },
+      {
+        "level": 3,
+        "label": "良",
+        "min": 19,
+        "max": 20
+      },
+      {
+        "level": 2,
+        "label": "优",
+        "min": 20,
+        "max": 21
+      },
+      {
+        "level": 1,
+        "label": "特优",
+        "min": 21
+      }
+    ]
+  }
+}
