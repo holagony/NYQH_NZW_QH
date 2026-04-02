@@ -666,7 +666,14 @@ class SPSO_PZ:
 
         elif "value" in var_config:
             value_config = var_config.get("value", {})
-            ref_name = value_config["ref"]
+            ref_name = value_config.get("ref")
+            if ref_name and ref_name in indicators:
+                return self._extract_data(indicators[ref_name], data_type)
+            else:
+                raise ValueError(f"引用的指标不存在: {ref_name}")
+
+        elif "ref" in var_config:
+            ref_name = var_config["ref"]
             if ref_name in indicators:
                 return self._extract_data(indicators[ref_name], data_type)
             else:
