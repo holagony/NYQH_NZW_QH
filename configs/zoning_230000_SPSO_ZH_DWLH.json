@@ -1,7 +1,7 @@
 {
     "indicators": {},
     "interpolation": {
-        "method": "lsm_idw"
+        "method": "lsm"
     },
     "classification": {
         "method": "natural_breaks",

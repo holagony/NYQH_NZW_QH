@@ -252,8 +252,56 @@ class SPSO_ZH:
 
         print("第二步：对致灾因子危险性指数进行插值")
         interpolated_ZL_HazardRisk = self._interpolate_risk(ZL_HazardRisk, station_coords, config, algorithmConfig, 'ZL_HazardRisk')
-        print('第三步，基于插值栅格化指数进行区划分级')
 
+        print('第三步，承载体权重计算')
+        # 致灾因子危险性
+        ZZ_array = interpolated_ZL_HazardRisk['data']
+        ZZ_array = normalize_array(ZZ_array)
+        
+        # 脆弱度
+        CR_percent_path = os.path.dirname(config.get("gridFilePath"))[:-4] + "/黑龙江承灾体/渍涝/Z_AGME_C_BEHB_1991010120201231_P_ACDIS_ACRS_FWL-FRAIL_100M_CHN_L88_PD_000_00.tif"
+        CR_temp_path = os.path.dirname(config.get("gridFilePath"))[:-4] + "/CR_temp.tif"
+        CR_temp_path = LSMIDWInterpolation()._align_datasets(config.get("gridFilePath"), CR_percent_path, CR_temp_path)
+        in_ds_CR = gdal.Open(CR_temp_path)
+        CR_array = in_ds_CR.GetRasterBand(1).ReadAsArray()  # 读取波段数据
+        Nodata = in_ds_CR.GetRasterBand(1).GetNoDataValue()
+        CR_array = np.where(CR_array == Nodata, np.nan, CR_array)
+        CR_array = normalize_array(CR_array)
+
+        # 暴露度
+        BL_percent_path = os.path.dirname(config.get("gridFilePath"))[:-4] + "/黑龙江承灾体/渍涝/Z_AGME_C_BEHB_1991010120201231_P_ACDIS_ACRS_FWL-SENS_100M_CHN_L88_PD_000_00.tif"
+        BL_temp_path = os.path.dirname(config.get("gridFilePath"))[:-4] + "/BL_temp.tif"
+        BL_temp_path = LSMIDWInterpolation()._align_datasets(config.get("gridFilePath"), BL_percent_path, BL_temp_path)
+        in_ds_BL = gdal.Open(BL_temp_path)
+        BL_array = in_ds_BL.GetRasterBand(1).ReadAsArray()  # 读取波段数据
+        Nodata = in_ds_BL.GetRasterBand(1).GetNoDataValue()
+        BL_array = np.where(BL_array == Nodata, np.nan, BL_array)
+        BL_array = normalize_array(BL_array)
+        
+        # 防灾减灾
+        FZJZ_percent_path = os.path.dirname(config.get("gridFilePath"))[:-4] + "/黑龙江承灾体/渍涝/Z_AGME_C_BEHB_1991010120201231_P_ACDIS_ACRS_FWL-PREV_100M_CHN_L88_PD_000_00.tif"
+        FZJZ_temp_path = os.path.dirname(config.get("gridFilePath"))[:-4] + "/FZJZ_temp.tif"
+        FZJZ_temp_path = LSMIDWInterpolation()._align_datasets(config.get("gridFilePath"), FZJZ_percent_path, FZJZ_temp_path)
+        in_ds_FZJZ = gdal.Open(FZJZ_temp_path)
+        FZJZ_array = in_ds_FZJZ.GetRasterBand(1).ReadAsArray()  # 读取波段数据
+        Nodata = in_ds_FZJZ.GetRasterBand(1).GetNoDataValue()
+        FZJZ_array = np.where(FZJZ_array == Nodata, np.nan, FZJZ_array)
+        FZJZ_array = normalize_array(FZJZ_array)
+
+        w_hazard, w_vulnerability, w_exposure, w_prevention = 0.58, 0.12, 0.23, 0.07
+        risk = (
+            np.nan_to_num(ZZ_array, nan=0.0).astype(np.float32) * w_hazard +
+            np.nan_to_num(CR_array, nan=0.0).astype(np.float32) * w_vulnerability +
+            np.nan_to_num(BL_array, nan=0.0).astype(np.float32) * w_exposure +
+            (1.0 - np.nan_to_num(FZJZ_array, nan=0.0).astype(np.float32)) * w_prevention
+        )
+
+        risk[np.isnan(ZZ_array)] = np.nan
+        interpolated_ZL_HazardRisk['data'] = risk
+        risk_tif_path = os.path.join(config.get("resultPath"), "intermediate", "渍涝综合风险指数.tif")
+        self._save_geotiff_gdal(risk.astype(np.float32), interpolated_ZL_HazardRisk['meta'], risk_tif_path, 0)
+        print(f"渍涝综合风险指数数值范围: {np.nanmin(risk):.4f} ~ {np.nanmax(risk):.4f}")
+        print('第四步，基于插值栅格化指数进行区划分级')
         final_result = self._perform_classification(interpolated_ZL_HazardRisk, params)
         
         print(f'计算{params["config"].get("cropCode","")}-{params["config"].get("zoningType","")}-{params["config"].get("element","")}-区划完成')

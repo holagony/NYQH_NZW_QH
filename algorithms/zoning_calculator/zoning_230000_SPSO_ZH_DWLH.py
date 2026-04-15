@@ -2,6 +2,7 @@ import numpy as np
 from algorithms.data_manager import DataManager
 from algorithms.interpolation.idw import IDWInterpolation
 from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
+from algorithms.interpolation.lsm import LSMInterpolation
 import os
 from osgeo import gdal
 
@@ -324,12 +325,71 @@ class SPSO_ZH:
         if method == 'lsm_idw':
             result = LSMIDWInterpolation().execute(interp_data, iparams)
         else:
-            result = IDWInterpolation().execute(interp_data, iparams)
+            result = LSMInterpolation().execute(interp_data, iparams)
 
         # 归一化栅格并保存中间结果tif
         result_norm = normalize_array(result['data'])
         g_tif_path = os.path.join(config.get("resultPath"), "intermediate", "低温冷害危险性指数_归一化.tif")
         self._save_geotiff_gdal(result_norm, result['meta'], g_tif_path, 0)
+
+        # 致灾因子危险性
+        ZZ_array = result_norm
+
+        # 脆弱度
+        CR_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/黑龙江承灾体/冷害/Z_AGME_C_BEHB_1991010120201231_P_ACDIS_ACRS_LTSHLJ-FRAIL-CVUY19912020_100M_CHN_L88_PD_000_00.tif"
+        CR_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/CR_temp.tif"
+        # CR_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], CR_percent_path, CR_temp_path)
+        CR_temp_path = LSMInterpolation()._align_datasets(interp_data["grid_path"], CR_percent_path, CR_temp_path)
+        in_ds_CR = gdal.Open(CR_temp_path)
+        CR_array = in_ds_CR.GetRasterBand(1).ReadAsArray()  # 读取波段数据
+        Nodata = in_ds_CR.GetRasterBand(1).GetNoDataValue()
+        CR_array = np.where(CR_array == Nodata, np.nan, CR_array)
+        CR_array = normalize_array(CR_array)
+
+        # 暴露度
+        BL_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/黑龙江承灾体/冷害/Z_AGME_C_BEHB_1991010120201231_P_ACDIS_ACRS_LTSHLJ-SENS_100M_CHN_L88_PD_000_00.tif"
+        BL_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/BL_temp.tif"
+        # BL_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], BL_percent_path, BL_temp_path)
+        BL_temp_path = LSMInterpolation()._align_datasets(interp_data["grid_path"], BL_percent_path, BL_temp_path)
+        in_ds_BL = gdal.Open(BL_temp_path)
+        BL_array = in_ds_BL.GetRasterBand(1).ReadAsArray()  # 读取波段数据
+        Nodata = in_ds_BL.GetRasterBand(1).GetNoDataValue()
+        BL_array = np.where(BL_array == Nodata, np.nan, BL_array)
+        BL_array = normalize_array(BL_array)
+        
+        # 防灾减灾
+        FZJZ_percent_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/黑龙江承灾体/冷害/Z_AGME_C_BEHB_1991010120201231_P_ACDIS_ACRS_LTSHLJ-PREV_100M_CHN_L88_PD_000_00.tif"
+        FZJZ_temp_path = os.path.dirname(interp_data["grid_path"])[:-4] + "/FZJZ_temp.tif"
+        # FZJZ_temp_path = LSMIDWInterpolation()._align_datasets(interp_data["grid_path"], FZJZ_percent_path, FZJZ_temp_path)
+        FZJZ_temp_path = LSMInterpolation()._align_datasets(interp_data["grid_path"], FZJZ_percent_path, FZJZ_temp_path)
+        in_ds_FZJZ = gdal.Open(FZJZ_temp_path)
+        FZJZ_array = in_ds_FZJZ.GetRasterBand(1).ReadAsArray()  # 读取波段数据
+        Nodata = in_ds_FZJZ.GetRasterBand(1).GetNoDataValue()
+        FZJZ_array = np.where(FZJZ_array == Nodata, np.nan, FZJZ_array)
+        FZJZ_array = normalize_array(FZJZ_array)
+
+
+
+        w_hazard, w_vulnerability, w_exposure, w_prevention = 0.584, 0.153, 0.153, 0.11
+        risk = (
+            np.nan_to_num(ZZ_array, nan=0.0).astype(np.float32) * w_hazard +
+            np.nan_to_num(CR_array, nan=0.0).astype(np.float32) * w_vulnerability +
+            np.nan_to_num(BL_array, nan=0.0).astype(np.float32) * w_exposure +
+            (1.0 - np.nan_to_num(FZJZ_array, nan=0.0).astype(np.float32)) * w_prevention
+        )
+        risk[np.isnan(ZZ_array)] = np.nan
+
+        print(f"综合风险指数数值范围: {np.nanmin(risk):.4f} ~ {np.nanmax(risk):.4f}")
+
+        risk_tif_path = os.path.join(config.get("resultPath"), "intermediate", "低温冷害综合风险指数.tif")
+        self._save_geotiff_gdal(risk.astype(np.float32), result['meta'], risk_tif_path, 0)
+
+        data_out = risk
+
+
+
+
+
 
         # 增加分级
         class_conf = algorithmConfig.get('classification', {})
