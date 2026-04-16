@@ -84,7 +84,7 @@
         }
     },
   "interpolation": {
-    "method": "idw",
+    "method": "lsm_idw",
     "params": {
       "block_size": 256,
       "radius_dist": 5.0,

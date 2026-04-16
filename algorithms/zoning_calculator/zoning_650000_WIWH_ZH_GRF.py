@@ -47,7 +47,83 @@ class WIWH_ZH:
             'GRF_severe': 3       # 重度标记值
         }
 
-    def calculate_GRF_index(self, station_indicators: pd.DataFrame, config: Dict[str, Any]) -> Dict[int, float]:
+    def _to_indicator_df(self, val: Any, col: str) -> pd.DataFrame:
+        if isinstance(val, pd.DataFrame):
+            if val.shape[1] == 1:
+                out = val.copy()
+                out.columns = [col]
+                return out
+            return pd.DataFrame({col: val.iloc[:, 0].values})
+
+        if isinstance(val, pd.Series):
+            return val.to_frame(name=col)
+
+        if isinstance(val, dict):
+            df = pd.DataFrame.from_dict(val, orient='index')
+            if df.shape[1] == 1:
+                df.columns = [col]
+            return df
+
+        if isinstance(val, str):
+            s = val.strip()
+            if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+                try:
+                    obj = json.loads(s)
+                except Exception:
+                    obj = None
+                if isinstance(obj, dict):
+                    df = pd.DataFrame.from_dict(obj, orient='index')
+                    if df.shape[1] == 1:
+                        df.columns = [col]
+                    return df
+                if isinstance(obj, list):
+                    return pd.DataFrame({col: obj})
+            return pd.DataFrame({col: [np.nan]})
+
+        if isinstance(val, (list, tuple, np.ndarray)):
+            return pd.DataFrame({col: list(val)})
+
+        if isinstance(val, (int, float, np.number)):
+            return pd.DataFrame({col: [float(val)]})
+
+        return pd.DataFrame({col: [np.nan]})
+
+    def _sanitize_station_coords(self, station_coords: Dict[str, Any]) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        for station_id, coords in station_coords.items():
+            if not isinstance(coords, dict):
+                continue
+            alti = coords.get('altitude', np.nan)
+            try:
+                alti = float(alti)
+            except Exception:
+                alti = np.nan
+            if np.isnan(alti):
+                alti = 0.0
+            out[station_id] = {**coords, 'altitude': alti}
+        return out
+
+    def _compute_station_indicators_from_daily(self, station_ids: List[str], indicator_configs: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        dm = DataManager(config['inputFilePath'], station_file=config.get('stationFilePath'), multiprocess=False)
+        ic = IndicatorCalculator()
+        start_date = config.get('startDate')
+        end_date = config.get('endDate')
+        results: Dict[str, Dict[str, Any]] = {}
+        for sid in station_ids:
+            try:
+                df = dm.load_station_data(sid, start_date, end_date)
+            except Exception:
+                df = pd.DataFrame()
+            station_res: Dict[str, Any] = {}
+            for name, cfg in indicator_configs.items():
+                try:
+                    station_res[name] = ic.calculate(df, cfg)
+                except Exception:
+                    station_res[name] = np.nan
+            results[sid] = station_res
+        return results
+
+    def calculate_GRF_index(self, station_indicators: Dict[Any, Dict[str, Any]], config: Dict[str, Any]) -> Dict[int, float]:
         """
         计算干热风强度指数R
         
@@ -63,13 +139,13 @@ class WIWH_ZH:
             GRF_moderate = indicators.get('GRF_moderate', np.nan)  # 总日照时数
             GRF_severe = indicators.get('GRF_severe', np.nan)  # 降水日数
 
-            # str转字典
-            GRF_light = pd.DataFrame.from_dict(GRF_light, orient='index')
-            GRF_moderate = pd.DataFrame.from_dict(GRF_moderate, orient='index')
-            GRF_severe = pd.DataFrame.from_dict(GRF_severe, orient='index')
+            GRF_light = self._to_indicator_df(GRF_light, "GRF_light")
+            GRF_moderate = self._to_indicator_df(GRF_moderate, "GRF_moderate")
+            GRF_severe = self._to_indicator_df(GRF_severe, "GRF_severe")
 
             merged_df = pd.concat([GRF_light, GRF_moderate, GRF_severe], axis=1)
             merged_df.columns = ['GRF_light', 'GRF_moderate', 'GRF_severe']
+            merged_df = merged_df.apply(pd.to_numeric, errors='coerce')
 
             '''
             merged_df['GRF_index'] = merged_df['GRF_light'] * self.WEIGHTS['GRF_light'] * self.MARKS['GRF_light'] + \
@@ -82,13 +158,6 @@ class WIWH_ZH:
                                      merged_df['GRF_moderate'].mean() * self.WEIGHTS['GRF_moderate'] * self.MARKS['GRF_moderate'] + \
                                      merged_df['GRF_severe'].mean() * self.WEIGHTS['GRF_severe'] * self.MARKS['GRF_severe']
 
-        max_value = max(GRF_indicators.values())
-        max_keys = [key for key, value in GRF_indicators.items() if value == max_value]
-        min_value = min(GRF_indicators.values())
-        min_keys = [key for key, value in GRF_indicators.items() if value == min_value]
-        print(f'新疆冬小麦干热风区划：单站最高干热风强度指数：{max_keys}：{max_value}')
-        print(f'新疆冬小麦干热风区划:单站最低干热风强度指数：{min_keys}：{min_value}')
-
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f'干热风强度指数_{timestamp}.csv'
         result_df = pd.DataFrame(list(GRF_indicators.items()), columns=['站点ID', '干热风强度指数'])   
@@ -96,7 +165,6 @@ class WIWH_ZH:
         intermediate_dir.mkdir(parents=True, exist_ok=True)
         output_path = intermediate_dir / filename
         result_df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        print(f"干热风强度指数文件已保存为 '{output_path}'")
 
         return GRF_indicators
 
@@ -169,42 +237,64 @@ class WIWH_ZH:
         返回:
             最终计算结果
         """
-        try:
-            station_indicators = params['station_indicators']
-            station_coords = params['station_coords']
-            algorithmConfig = params['algorithmConfig']
-            config = params['config']
-            self._algorithms = params['algorithms']
+        station_indicators = params['station_indicators']
+        station_coords = params['station_coords']
+        algorithmConfig = params['algorithmConfig']
+        config = params['config']
+        self._algorithms = params['algorithms']
 
-            print("开始计算新疆冬小麦干热风区划")
-            print('第一步，计算各站的干热风强度指数，并求历年平均')
-            GRF_index = self.calculate_GRF_index(station_indicators,config)
+        print("开始计算新疆冬小麦干热风区划")
+        print('第一步，计算各站的干热风强度指数，并求历年平均')
+        if isinstance(station_indicators, dict):
+            need_compute = True
+            required = ('GRF_light', 'GRF_moderate', 'GRF_severe')
+            for inds in station_indicators.values():
+                if not isinstance(inds, dict):
+                    continue
+                has_any = False
+                for k in required:
+                    v = inds.get(k, np.nan)
+                    if isinstance(v, dict) and len(v) > 0:
+                        has_any = True
+                        break
+                    if isinstance(v, (int, float, np.number)) and not np.isnan(v):
+                        has_any = True
+                        break
+                    if isinstance(v, str) and v.strip() not in ("", "nan", "NaN", "null", "None"):
+                        has_any = True
+                        break
+                if has_any:
+                    need_compute = False
+                    break
+            if need_compute:
+                indicator_configs = algorithmConfig.get('indicators', {})
+                if indicator_configs:
+                    station_ids = list(station_coords.keys())
+                    station_indicators = self._compute_station_indicators_from_daily(station_ids, indicator_configs, config)
 
-            print('第二步，根据干热风强度指数R，插值栅格化指数')
-            GRF_index_raster = self._perform_interpolation_for_indicator(GRF_index, station_coords, params, "GRF_risk")
+        station_coords = self._sanitize_station_coords(station_coords)
+        GRF_index = self.calculate_GRF_index(station_indicators, config)
+        valid_values = {sid: float(v) for sid, v in GRF_index.items() if isinstance(v, (int, float, np.number)) and not np.isnan(v)}
+        if not valid_values:
+            raise ValueError("没有有效的站点干热风强度指数，无法进行插值")
 
-            config = params['config']
-            mask_path = config.get("maskFilePath")
-            data = GRF_index_raster['data']
-            if mask_path:
-                mask_arr = _mask_to_target_grid(mask_path, GRF_index_raster['meta'])
-                data = np.where(mask_arr == 1, np.maximum(data, 0.0), np.nan)
-            else:
-                data = np.maximum(data, 0.0)
-            GRF_index_raster['data'] = data
+        print('第二步，根据干热风强度指数R，插值栅格化指数')
+        GRF_index_raster = self._perform_interpolation_for_indicator(valid_values, station_coords, params, "GRF_risk")
 
-            print('第三步，基于掩膜后的插值栅格化指数进行区划分级')
-            final_result = self._perform_classification(GRF_index_raster, params)
-            
-            print(f'计算{params["config"].get("cropCode","")}-{params["config"].get("zoningType","")}-{params["config"].get("element","")}-区划完成')
-            return final_result
+        mask_path = config.get("maskFilePath")
+        data = GRF_index_raster['data']
+        if mask_path:
+            mask_arr = _mask_to_target_grid(mask_path, GRF_index_raster['meta'])
+            data = np.where(mask_arr == 1, np.maximum(data, 0.0), np.nan)
+        else:
+            data = np.maximum(data, 0.0)
+        GRF_index_raster['data'] = data
 
-        except Exception as e:
-            print(f"计算过程中出错: {str(e)}")
-            return {
-                'status': 'error',
-                'message': str(e)
-            }    
+        print('第三步，基于掩膜后的插值栅格化指数进行区划分级')
+        final_result = self._perform_classification(GRF_index_raster, params)
+        
+        print(f'计算{params["config"].get("cropCode","")}-{params["config"].get("zoningType","")}-{params["config"].get("element","")}-区划完成')
+        return final_result
 
 
 

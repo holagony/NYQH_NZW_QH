@@ -36,6 +36,7 @@ def _strong_wind_days_by_year(df: pd.DataFrame, threshold: float = 13.9) -> dict
     if 'WIN_S_Max' not in df.columns:
         return {}
     w = pd.to_numeric(df['WIN_S_Max'], errors='coerce')
+    w = w.mask(w > 30, np.nan)
     sub = w[(w >= threshold) & (w.notna()) & (df.index.month.isin([8, 9, 10]))]
     if sub.empty:
         return {}
@@ -44,6 +45,18 @@ def _strong_wind_days_by_year(df: pd.DataFrame, threshold: float = 13.9) -> dict
 
 
 class SPMA_ZH:
+    def _calc_station_wind_metrics(self, df: pd.DataFrame, start_year: int, end_year: int, threshold: float) -> dict:
+        counts = _strong_wind_days_by_year(df, threshold=threshold)
+        years = list(range(int(start_year), int(end_year) + 1)) if start_year and end_year and end_year >= start_year else sorted(counts.keys())
+        if not years:
+            return {'times': np.nan, 'mean_days': np.nan, 'years_count': 0}
+        vals = [float(counts.get(y, 0.0)) for y in years]
+        return {
+            'times': float(np.nansum(vals)),
+            'mean_days': float(np.nanmean(vals)) if len(vals) > 0 else np.nan,
+            'years_count': int(len(years))
+        }
+
     def _save_geotiff_gdal(self, data, meta, output_path, nodata=0):
         """保存单波段 GeoTIFF（自动匹配GDAL数据类型）
         
@@ -134,16 +147,34 @@ class SPMA_ZH:
         station_ids = [sid for sid in station_ids if sid in available]
         start_date = params.get('startDate') or cfg.get('startDate')
         end_date = params.get('endDate') or cfg.get('endDate')
+        period_label = ''
+        start_year = None
+        end_year = None
+        try:
+            if start_date and end_date:
+                start_year = int(str(start_date)[:4])
+                end_year = int(str(end_date)[:4])
+                period_label = f"{start_year}-{end_year}年平均"
+        except Exception:
+            start_year = None
+            end_year = None
+            period_label = ''
+        threshold = float(algorithm_config.get('threshold', 13.9))
 
         values = {}
+        station_rows = []
         for sid in station_ids:
             df = dm.load_station_data(sid, start_date, end_date)
-            counts = _strong_wind_days_by_year(df, threshold=float(algorithm_config.get('threshold', 13.9)))
-            if not counts:
-                values[sid] = np.nan
-                continue
-            years = sorted(counts.keys())
-            values[sid] = float(np.nanmean([counts[y] for y in years])) if years else np.nan
+            metrics = self._calc_station_wind_metrics(df, start_year, end_year, threshold)
+            values[sid] = metrics['mean_days']
+            station_rows.append({
+                '站号': sid,
+                '统计时段': period_label,
+                '阈值(m/s)': threshold,
+                '统计年份数': metrics['years_count'],
+                '日最大风速≥阈值次数(次)': metrics['times'],
+                '大风日数(天/年)': metrics['mean_days'],
+            })
 
         interp = self._interpolate(values, station_coords, cfg, algorithm_config)
         grid = interp['data'].astype(np.float32)
@@ -159,7 +190,12 @@ class SPMA_ZH:
             norm = grid
         norm[~mask] = np.nan
 
-        norm_tif = os.path.join(cfg.get("resultPath"), "intermediate", "大风倒伏风险.tif")
+        result_path = cfg.get("resultPath") or os.getcwd()
+        inter_dir = Path(result_path) / "intermediate"
+        inter_dir.mkdir(parents=True, exist_ok=True)
+        if station_rows:
+            pd.DataFrame(station_rows).to_csv(str(inter_dir / "大风倒伏_站点中间指标.csv"), index=False, encoding='utf-8-sig')
+        norm_tif = str(inter_dir / "大风倒伏风险.tif")
         self._save_geotiff_gdal(norm, interp['meta'], norm_tif, 0)
 
         class_conf = algorithm_config.get('classification', {})

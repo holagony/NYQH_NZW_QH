@@ -142,6 +142,56 @@ class APPL_ZH:
             return np.nan
         return float(np.mean(vals))
 
+    def _calc_station_monthly_metrics(self, daily, algorithm_config):
+        if daily is None or len(daily) == 0:
+            return {
+                '3月降水量(mm)': np.nan,
+                '3月日降水量≥0.1mm日数(天)': np.nan,
+                '4月降水量(mm)': np.nan,
+                '4月日降水量≥0.1mm日数(天)': np.nan,
+                '5月降水量(mm)': np.nan,
+                '5月日降水量≥0.1mm日数(天)': np.nan,
+            }
+
+        thr = float(algorithm_config.get('dry_threshold_mm', 0.1))
+        if 'precip' in daily.columns:
+            p = daily['precip']
+        elif 'P' in daily.columns:
+            p = daily['P']
+        else:
+            return {
+                '3月降水量(mm)': np.nan,
+                '3月日降水量≥0.1mm日数(天)': np.nan,
+                '4月降水量(mm)': np.nan,
+                '4月日降水量≥0.1mm日数(天)': np.nan,
+                '5月降水量(mm)': np.nan,
+                '5月日降水量≥0.1mm日数(天)': np.nan,
+            }
+
+        months = [3, 4, 5]
+        years = sorted(p.index.year.unique())
+        per_month_sum = {m: [] for m in months}
+        per_month_cnt = {m: [] for m in months}
+        for y in years:
+            for m in months:
+                sub = p[(p.index.year == y) & (p.index.month == m)]
+                if sub.size == 0:
+                    continue
+                per_month_sum[m].append(float(np.nansum(sub.values)))
+                per_month_cnt[m].append(float((sub >= thr).sum()))
+
+        def _avg(vals):
+            return float(np.mean(vals)) if len(vals) > 0 else np.nan
+
+        return {
+            '3月降水量(mm)': _avg(per_month_sum[3]),
+            '3月日降水量≥0.1mm日数(天)': _avg(per_month_cnt[3]),
+            '4月降水量(mm)': _avg(per_month_sum[4]),
+            '4月日降水量≥0.1mm日数(天)': _avg(per_month_cnt[4]),
+            '5月降水量(mm)': _avg(per_month_sum[5]),
+            '5月日降水量≥0.1mm日数(天)': _avg(per_month_cnt[5]),
+        }
+
     def calculate_MYYGQGH(self, params):
         """计算苹果-萌芽幼果期干旱产品
         
@@ -168,12 +218,23 @@ class APPL_ZH:
         # 时间范围
         start_date = params.get('startDate') or cfg.get('startDate')
         end_date = params.get('endDate') or cfg.get('endDate')
+        period_label = ''
+        try:
+            if start_date and end_date:
+                sy = int(str(start_date)[:4])
+                ey = int(str(end_date)[:4])
+                period_label = f"{sy}-{ey}年平均"
+        except Exception:
+            period_label = ''
         # 计算站点 DR 值
         station_values = {}
+        station_metrics_rows = []
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             dr = self._calc_station_dr(daily, algorithm_config)
             station_values[sid] = float(dr) if np.isfinite(dr) else np.nan
+            metrics = self._calc_station_monthly_metrics(daily, algorithm_config)
+            station_metrics_rows.append({'站号': sid, '统计时段': period_label, **metrics})
         # 空间插值
         interp = self._interpolate(station_values, station_coords, cfg, algorithm_config)
         # 插值结果归一化
@@ -191,6 +252,9 @@ class APPL_ZH:
         out_dir.mkdir(parents=True, exist_ok=True)
         inter_dir = out_dir / "intermediate"
         inter_dir.mkdir(parents=True, exist_ok=True)
+        if station_metrics_rows:
+            df_metrics = pd.DataFrame(station_metrics_rows)
+            df_metrics.to_csv(str(inter_dir / "萌芽幼果期干旱_站点中间指标.csv"), index=False, encoding='utf-8-sig')
         # 写出中间结果（原值栅格）
         tif_path = str(inter_dir / "萌芽幼果期干旱指数.tif")
         self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)

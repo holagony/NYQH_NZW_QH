@@ -155,6 +155,51 @@ class APPL_ZH:
             return np.nan
         return float(np.mean(vals))
 
+    def _calc_station_season_metrics(self, daily, months, rain_day_thr):
+        if daily is None or len(daily) == 0:
+            return {
+                '6-8月35℃及以上高温日数': np.nan,
+                '6-8月降水量': np.nan,
+                '6-8月降水日数': np.nan,
+            }
+        if 'tmax' not in daily.columns:
+            tmax = None
+        else:
+            tmax = daily['tmax']
+        if 'precip' in daily.columns:
+            p = daily['precip']
+        elif 'P' in daily.columns:
+            p = daily['P']
+        else:
+            p = None
+
+        years = sorted(daily.index.year.unique())
+        hot_days_vals = []
+        pr_sum_vals = []
+        pr_days_vals = []
+        for y in years:
+            idx = (daily.index.year == y) & (daily.index.month.isin(months))
+            if not np.any(idx):
+                continue
+            if tmax is not None:
+                sub_t = tmax[idx]
+                if sub_t.size > 0:
+                    hot_days_vals.append(float((sub_t >= 35).sum()))
+            if p is not None:
+                sub_p = p[idx]
+                if sub_p.size > 0:
+                    pr_sum_vals.append(float(np.nansum(sub_p.values)))
+                    pr_days_vals.append(float((sub_p >= rain_day_thr).sum()))
+
+        def _avg(vals):
+            return float(np.mean(vals)) if len(vals) > 0 else np.nan
+
+        return {
+            '6-8月35℃及以上高温日数': _avg(hot_days_vals),
+            '6-8月降水量': _avg(pr_sum_vals),
+            '6-8月降水日数': _avg(pr_days_vals),
+        }
+
     def calculate_GSPDQGWGH(self, params):
         """果实膨大期高温干旱风险计算主流程
         
@@ -177,17 +222,29 @@ class APPL_ZH:
         end_date = params.get('endDate') or cfg.get('endDate')
         months = algorithm_config.get('months', [6, 7, 8])
         thr = float(algorithm_config.get('dry_threshold_mm', 0.1))
+        rain_day_thr = float(algorithm_config.get('rain_day_threshold_mm', 0.1))
         k = float(algorithm_config.get('k', 2.83))
         tmax_weight = float(algorithm_config.get('tmax_weight', 0.4))
         dr_weight = float(algorithm_config.get('dr_weight', 0.6))
         tmax_map = {}
         dr_map = {}
+        station_metrics_rows = []
+        period_label = ''
+        try:
+            if start_date and end_date:
+                sy = int(str(start_date)[:4])
+                ey = int(str(end_date)[:4])
+                period_label = f"{sy}-{ey}年平均"
+        except Exception:
+            period_label = ''
         for sid in station_ids:
             daily = dm.load_station_data(sid, start_date, end_date)
             t_risk = self._calc_tmax_risk(daily, months)
             d_risk = self._calc_dr(daily, thr, k, months)
             tmax_map[sid] = float(t_risk) if np.isfinite(t_risk) else np.nan
             dr_map[sid] = float(d_risk) if np.isfinite(d_risk) else np.nan
+            metrics = self._calc_station_season_metrics(daily, months, rain_day_thr)
+            station_metrics_rows.append({'站号': sid, '统计时段': period_label, **metrics})
         # 站间归一化
         dr_values = np.array([v for v in dr_map.values() if np.isfinite(v)], dtype=float)
         tv_values = np.array([v for v in tmax_map.values() if np.isfinite(v)], dtype=float)
@@ -252,6 +309,9 @@ class APPL_ZH:
         out_dir.mkdir(parents=True, exist_ok=True)
         inter_dir = out_dir / "intermediate"
         inter_dir.mkdir(parents=True, exist_ok=True)
+        if station_metrics_rows:
+            df_metrics = pd.DataFrame(station_metrics_rows)
+            df_metrics.to_csv(str(inter_dir / "果实膨大期高温干旱_站点中间指标.csv"), index=False, encoding='utf-8-sig')
         tif_path = str(inter_dir / "果实膨大期高温干旱风险指数.tif")
         self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)
         # 分类（可选）
