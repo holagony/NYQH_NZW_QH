@@ -142,7 +142,7 @@ class APPL_ZH:
         config = params['config']
         algorithmConfig = params['algorithmConfig']
         interpolation_config = algorithmConfig.get("interpolation", {})
-        interpolation_method = interpolation_config.get("method", "lsm_idw")
+        interpolation_method = interpolation_config.get("method", "idw")
         interpolator = self._get_algorithm(f"interpolation.{interpolation_method}")
         interpolation_data = {
             'station_values': station_values,
