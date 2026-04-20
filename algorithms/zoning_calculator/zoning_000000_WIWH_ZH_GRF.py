@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import datetime
 from pathlib import Path
 from osgeo import gdal
 from algorithms.data_manager import DataManager
@@ -291,6 +292,16 @@ class WIWH_ZH:
                 else:
                     sel_coords.update(coords)
 
+        out_dir = Path(cfg.get("resultPath") or os.getcwd())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        inter_dir = out_dir / "intermediate"
+        inter_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_path = inter_dir / f"干热风强度指数_{timestamp}.csv"
+        pd.DataFrame(list(station_values.items()), columns=["站点ID", "干热风强度指数"]).to_csv(
+            csv_path, index=False, encoding="utf-8-sig"
+        )
+
         # 插值与掩膜（先插值，再掩膜），随后归一化
         interp = self._interpolate(station_values, sel_coords, cfg, algorithm_config)
         mask_path = cfg.get('maskFilePath')
@@ -299,10 +310,6 @@ class WIWH_ZH:
         interp['data'] = interp_data_masked
 
         # 输出路径与中间产品
-        out_dir = Path(cfg.get("resultPath") or os.getcwd())
-        out_dir.mkdir(parents=True, exist_ok=True)
-        inter_dir = out_dir / "intermediate"
-        inter_dir.mkdir(parents=True, exist_ok=True)
         tif_path = str(inter_dir / "全国冬小麦干热风指数.tif")
         self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)
         
