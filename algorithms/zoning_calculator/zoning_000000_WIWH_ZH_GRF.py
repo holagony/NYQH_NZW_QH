@@ -189,6 +189,7 @@ class WIWH_ZH:
         tmax = daily["tmax"]
         rhum = daily["rhum"] if "rhum" in daily.columns else pd.Series(index=daily.index, dtype=float)
         wind = daily["wind"] if "wind" in daily.columns else pd.Series(index=daily.index, dtype=float)
+        wind = wind.where(wind <= 30, np.nan)
         hd_list = []
         for y in years:
             start_dt = pd.Timestamp(
