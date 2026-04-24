@@ -260,6 +260,16 @@ class WIWH_ZH:
                 else:
                     sel_coords.update(coords)
 
+        out_dir = Path(cfg.get("resultPath") or os.getcwd())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        inter_dir = out_dir / "intermediate"
+        inter_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(list(station_values.items()), columns=["station_id", "CJWSD"]).to_csv(
+            str(inter_dir / "全国冬小麦晚霜冻指数_站点计算结果.csv"),
+            index=False,
+            encoding="utf-8-sig"
+        )
+
         # 插值与掩膜（先插值，再掩膜），随后归一化
         interp = self._interpolate(station_values, sel_coords, cfg, algorithm_config)
         mask_path = cfg.get('maskFilePath')
@@ -269,10 +279,6 @@ class WIWH_ZH:
         # 将掩膜后的结果放回
         interp['data'] = interp_data_masked
         # 输出路径与中间产品
-        out_dir = Path(cfg.get("resultPath") or os.getcwd())
-        out_dir.mkdir(parents=True, exist_ok=True)
-        inter_dir = out_dir / "intermediate"
-        inter_dir.mkdir(parents=True, exist_ok=True)
         tif_path = str(inter_dir / "全国冬小麦晚霜冻指数.tif")
         self._save_geotiff_gdal(interp['data'].astype(np.float32), interp['meta'], tif_path, 0)
         

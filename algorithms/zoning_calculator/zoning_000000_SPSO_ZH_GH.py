@@ -342,16 +342,39 @@ class SPSO_ZH:
                         sel_coords[sid] = station_coords.get(sid, coord)
                 else:
                     sel_coords.update(coords)
+
+        out_dir = Path(cfg.get("resultPath") or os.getcwd())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        inter_dir = out_dir / "intermediate"
+        inter_dir.mkdir(parents=True, exist_ok=True)
+        station_df = pd.DataFrame(list(station_values.items()), columns=["station_id", "GH"])
+        station_df.to_csv(
+            str(inter_dir / "干旱强度指数_站点计算结果.csv"),
+            index=False,
+            encoding="utf-8-sig"
+        )
+        valid = pd.to_numeric(station_df["GH"], errors="coerce")
+        mask = valid.notna()
+        if mask.any():
+            mn = float(valid[mask].min())
+            mx = float(valid[mask].max())
+            if mx == mn:
+                station_df["GH_norm"] = np.where(mask, 0.5, np.nan)
+            else:
+                station_df["GH_norm"] = np.where(mask, (valid - mn) / (mx - mn), np.nan)
+        else:
+            station_df["GH_norm"] = np.nan
+        station_df[["station_id", "GH_norm"]].to_csv(
+            str(inter_dir / "干旱强度指数_站点计算结果_归一化.csv"),
+            index=False,
+            encoding="utf-8-sig"
+        )
     
         # 5) 空间插值生成干旱强度栅格
         interp = self._interpolate(station_values, sel_coords, cfg, algorithm_config)
         interp_data = np.maximum(interp['data'], 0.0)
         
         # 6) 输出中间与最终结果到 GeoTIFF
-        out_dir = Path(cfg.get("resultPath") or os.getcwd())
-        out_dir.mkdir(parents=True, exist_ok=True)
-        inter_dir = out_dir / "intermediate"
-        inter_dir.mkdir(parents=True, exist_ok=True)
         tif_path = str(inter_dir / "干旱强度指数.tif")
         self._save_geotiff_gdal(interp_data.astype(np.float32), interp['meta'], tif_path, 0)
         class_conf = algorithm_config.get('classification', {})
