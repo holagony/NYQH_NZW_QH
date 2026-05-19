@@ -313,6 +313,9 @@ class SPSO_ZH:
             data_max = float(np.max(vals))
             print(f"插值前站点数值范围: {data_min:.4f} ~ {data_max:.4f}")
 
+        df_linshi = pd.DataFrame(list(station_values.items()), columns=['station_id', 'dangerous_value'])
+        df_linshi.to_csv(os.path.join(cfg.get("resultPath"), "intermediate", "dangerous_station.csv"), index=False)
+        
         interp_conf = algorithm_config.get('interpolation', {})
         method = str(interp_conf.get('method', 'idw')).lower()
         iparams = interp_conf.get('params', {})

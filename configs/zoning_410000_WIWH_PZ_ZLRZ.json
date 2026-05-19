@@ -48,7 +48,7 @@
         },
     "formula": {
         "type": "custom_formula",
-        "formula": "833.3 - 2.953 * X1 + 1.757 * X2 + 0.086 * X3 - 3.63 * X4 - 0.056 * X5",
+        "formula": "-0.4 * X1 + 0.2 * X2 - 0.4 * X4",
         "variables": {
             "X1": {
                 "ref": "Pred"
@@ -68,8 +68,11 @@
         }
     },
     "interpolation": {
-        "order": "after",
-        "method": "idw"
+        "method": "lsm_idw",
+        "params": {
+        "radius_dist": 10,
+        "first_size": 100
+        }
     },
     "classification": {
         "method": "natural_breaks",

@@ -112,7 +112,7 @@ class WIWH_BC:
                 continue
             mask = (daily.index >= start_date) & (daily.index <= end_date)
             cnt += int(ok_all[mask].sum())
-        return cnt
+        return cnt/30
 
     def _compute_station_values(self, station_coords: Dict[str, Any], cfg: Dict[str, Any], algo_cfg: Dict[str, Any]) -> Dict[str, float]:
         csv_path =  cfg.get('growthPeriodPath')

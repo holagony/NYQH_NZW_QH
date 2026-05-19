@@ -5,7 +5,7 @@ from algorithms.interpolation.lsm_idw import LSMIDWInterpolation
 from algorithms.interpolation.lsm import LSMInterpolation
 import os
 from osgeo import gdal
-
+import pandas as pd
 
 def normalize_array(array):
     """
@@ -304,6 +304,9 @@ class SPSO_ZH:
         common_sids = [sid for sid in sids if sid in station_coords]
         dangerous_station = {sid: float(dangerous_vals[sid_to_idx[sid]]) for sid in common_sids}
         coords_used = {sid: station_coords[sid] for sid in common_sids}
+
+        df_linshi = pd.DataFrame(list(dangerous_station.items()), columns=['station_id', 'dangerous_value'])
+        df_linshi.to_csv(os.path.join(config.get("resultPath"), "intermediate", "dangerous_station.csv"), index=False)
 
         # 插值参数与数据准备
         interp_conf = algorithmConfig.get('interpolation')

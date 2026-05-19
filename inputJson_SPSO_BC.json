@@ -11,6 +11,7 @@
     "@element": "SXC",
     "element": "SXC",
     "@inputFilePath":"输入天擎站点数据路径",
+    "dependDir": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/depend",
     "inputFilePath": "/mnt/PRESKY/user/wuyujie/yanfa/NYQH/inputdata/tianqing_stn",
     "@areaCode": "行政区划编码",
     "areaCode": "230000",
