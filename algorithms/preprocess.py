@@ -54,7 +54,7 @@ class DataPreprocessor:
             return True
 
         except Exception as e:
-            self.fjson.log(f"依赖数据预处理失败: {str(e)}", codeId='1')
+            self.fjson.info(f"依赖数据预处理失败: {str(e)}", codeId='1')
             return False
 
     def _final_consistency_check(self):
@@ -80,9 +80,9 @@ class DataPreprocessor:
         for desc, file_path in raster_files.items():
             if file_path and file_path.strip() and Path(file_path).exists():
                 if self._are_rasters_consistent(grid_path, file_path):
-                    self.fjson.log(f"✓ {desc}与格网文件一致: {file_path}")
+                    self.fjson.log(f"{desc}与格网文件一致: {file_path}")
                 else:
-                    self.fjson.log(f"✗ {desc}与格网文件不一致，进行强制重采样: {file_path}")
+                    self.fjson.log(f"{desc}与格网文件不一致，进行强制重采样: {file_path}")
                     self._force_resample_to_match(file_path, grid_path, desc)
 
     def _force_resample_to_match(self, target_path: str, ref_path: str, file_desc: str):
@@ -110,7 +110,7 @@ class DataPreprocessor:
                 # else:
                 #     self.fjson.log(f"⚠ {file_desc}重采样后仍与格网文件不一致")
             else:
-                self.fjson.log(f"✗ {file_desc}重采样失败")
+                self.fjson.log(f"{file_desc}重采样失败")
                 
         except Exception as e:
             self.fjson.log(f"强制重采样{file_desc}异常: {str(e)}")
@@ -263,9 +263,9 @@ class DataPreprocessor:
                 self.fjson.log(f"成功掩膜DEM文件: {new_path}")
                 # 立即验证一致性
                 if self._are_rasters_consistent(grid_path, new_path):
-                    self.fjson.log(f"✓ DEM文件与格网文件一致")
+                    self.fjson.log("DEM文件与格网文件一致")
                 else:
-                    self.fjson.log(f"⚠ DEM文件与格网文件不一致，将进行重采样")
+                    self.fjson.log("DEM文件与格网文件不一致，将进行重采样")
                     self._force_resample_to_match(new_path, grid_path, "DEM文件")
                 return True
             else:
@@ -274,10 +274,10 @@ class DataPreprocessor:
             self.fjson.log(f"DEM文件已存在: {dem_path}")
             # 检查并确保与格网文件一致
             if self._are_rasters_consistent(grid_path, dem_path):
-                self.fjson.log(f"✓ DEM文件与格网文件一致")
+                self.fjson.log("DEM文件与格网文件一致")
                 return True
             else:
-                self.fjson.log(f"⚠ DEM文件与格网文件不一致，将进行重采样")
+                self.fjson.log("DEM文件与格网文件不一致，将进行重采样")
                 self._force_resample_to_match(dem_path, grid_path, "DEM文件")
                 return True
 
@@ -305,9 +305,9 @@ class DataPreprocessor:
                         self._set_optional_file_path(file_type, new_path)
                         # 验证一致性
                         if self._are_rasters_consistent(grid_path, new_path):
-                            self.fjson.log(f"✓ {file_type}文件与格网文件一致")
+                            self.fjson.log(f"{file_type}文件与格网文件一致")
                         else:
-                            self.fjson.log(f"⚠ {file_type}文件与格网文件不一致，将进行重采样")
+                            self.fjson.log(f"{file_type}文件与格网文件不一致，将进行重采样")
                             self._force_resample_to_match(new_path, grid_path, f"{file_type}文件")
                     else:
                         self.fjson.log(f"无法找到或生成{file_type}文件，将使用空路径")
@@ -316,9 +316,9 @@ class DataPreprocessor:
                     self.fjson.log(f"{file_type}文件已存在: {file_path}")
                     # 检查并确保一致性
                     if self._are_rasters_consistent(grid_path, file_path):
-                        self.fjson.log(f"✓ {file_type}文件与格网文件一致")
+                        self.fjson.log(f"{file_type}文件与格网文件一致")
                     else:
-                        self.fjson.log(f"⚠ {file_type}文件与格网文件不一致，将进行重采样")
+                        self.fjson.log(f"{file_type}文件与格网文件不一致，将进行重采样")
                         self._force_resample_to_match(file_path, grid_path, f"{file_type}文件")
             else:
                 self.fjson.log(f"{file_type}文件路径为空，跳过处理")

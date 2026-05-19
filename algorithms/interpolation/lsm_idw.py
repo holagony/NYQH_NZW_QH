@@ -166,7 +166,7 @@ class LSMIDWInterpolation():
             model = sm.OLS(y, X).fit()
             residuals = model.resid
             
-            print(f"模型R²: {model.rsquared:.4f}")
+            print(f"模型R2: {model.rsquared:.4f}")
             return model, residuals
             
         except Exception as e:
